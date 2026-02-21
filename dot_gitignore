@@ -1,0 +1,11 @@
+AGENTS.md
+opencode.jsonc
+.agent/
+.opencode/
+PLAN.md
+opensrc/
+Documents/*.docx
+Documents/Lab/**
+Documents/*.md
+btca.config.jsonc
+.overseer/

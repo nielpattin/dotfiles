@@ -1,0 +1,28 @@
+{
+  "lastChangelogVersion": "0.54.0",
+  "hideThinkingBlock": false,
+  "defaultProvider": "openai-codex",
+  "defaultModel": "gpt-5.3-codex",
+  "editorPaddingX": 0,
+  "defaultThinkingLevel": "medium",
+  "theme": "dark",
+  "transport": "sse",
+  "packages": [
+    "https://github.com/Whamp/pi-read-map",
+    "C:/Users/niel/.pi/agent/extensions-src/pi-amplike",
+    {
+      "source": "git:github.com/tmustier/pi-extensions",
+      "extensions": [
+        "arcade/spice-invaders.ts",
+        "arcade/picman.ts",
+        "arcade/ping.ts",
+        "arcade/tetris.ts",
+        "arcade/mario-not/mario-not.ts"
+      ]
+    }
+  ],
+  "extensions": [
+    "C:/Users/niel/.pi/agent/extensions-src/pi-sub/packages/sub-core/index.ts",
+    "C:/Users/niel/.pi/agent/extensions-src/pi-sub/packages/sub-bar/index.ts"
+  ]
+}
