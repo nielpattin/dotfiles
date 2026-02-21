@@ -1,0 +1,12 @@
+[tools]
+"aqua:jesseduffield/lazygit" = "latest"
+bun = "latest"
+chezmoi = "2.69.4"
+gh = "latest"
+"github:trasta298/keifu" = "latest"
+go = "latest"
+mitmproxy = "latest"
+node = "latest"
+pnpm = "latest"
+python = "latest"
+uv = "latest"
