@@ -1,0 +1,10 @@
+[".config/opencode/plugins/opencode-usage-plugin"]
+    type = "git-repo"
+    url = "https://github.com/nielpattin/opencode-usage-plugin.git"
+    refreshPeriod = "168h"
+
+    [".config/opencode/plugins/opencode-usage-plugin".clone]
+        args = ["--branch", "master"]
+
+    [".config/opencode/plugins/opencode-usage-plugin".pull]
+        args = ["--ff-only"]

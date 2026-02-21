@@ -1,14 +1,14 @@
 {
   "version": 3,
   "skills": {
-    "react-flow": {
-      "source": "existential-birds/beagle",
+    "svelte-code-writer": {
+      "source": "sveltejs/mcp",
       "sourceType": "github",
-      "sourceUrl": "https://github.com/existential-birds/beagle.git",
-      "skillPath": "plugins/beagle-react/skills/react-flow/SKILL.md",
-      "skillFolderHash": "1f5954bcd22806443e0138b85cacba2fc1b424c6",
-      "installedAt": "2026-02-17T00:59:33.790Z",
-      "updatedAt": "2026-02-17T00:59:33.790Z"
+      "sourceUrl": "https://github.com/sveltejs/mcp.git",
+      "skillPath": "plugins/svelte/skills/svelte-code-writer/SKILL.md",
+      "skillFolderHash": "d1fe3546e88768cc3bb8bbf052a059fc195f180b",
+      "installedAt": "2026-02-21T15:06:34.726Z",
+      "updatedAt": "2026-02-21T15:06:34.726Z"
     },
     "find-skills": {
       "source": "vercel-labs/skills",
@@ -16,35 +16,8 @@
       "sourceUrl": "https://github.com/vercel-labs/skills.git",
       "skillPath": "skills/find-skills/SKILL.md",
       "skillFolderHash": "c2f31172b6f256272305a5e6e7228b258446899f",
-      "installedAt": "2026-02-17T01:00:00.038Z",
-      "updatedAt": "2026-02-17T01:00:00.038Z"
-    },
-    "tailwindcss-advanced-layouts": {
-      "source": "josiahsiegel/claude-plugin-marketplace",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/josiahsiegel/claude-plugin-marketplace.git",
-      "skillPath": "plugins/tailwindcss-master/skills/tailwindcss-advanced-layouts/SKILL.md",
-      "skillFolderHash": "65e47f04cf8f9210f5e84f980a29aa8e0f9e0cd7",
-      "installedAt": "2026-02-17T01:16:19.028Z",
-      "updatedAt": "2026-02-17T01:16:19.028Z"
-    },
-    "tailwindcss-animations": {
-      "source": "josiahsiegel/claude-plugin-marketplace",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/josiahsiegel/claude-plugin-marketplace.git",
-      "skillPath": "plugins/tailwindcss-master/skills/tailwindcss-animations/SKILL.md",
-      "skillFolderHash": "786560a38d2446b470a29e986ed3912f8f5fb690",
-      "installedAt": "2026-02-17T01:16:27.546Z",
-      "updatedAt": "2026-02-17T01:16:27.546Z"
-    },
-    "tailwindcss": {
-      "source": "hairyf/skills",
-      "sourceType": "github",
-      "sourceUrl": "https://github.com/hairyf/skills.git",
-      "skillPath": "skills/tailwindcss/SKILL.md",
-      "skillFolderHash": "7b8035d2b0740535dab2c549847075dacc247afe",
-      "installedAt": "2026-02-17T01:17:00.095Z",
-      "updatedAt": "2026-02-17T01:17:00.095Z"
+      "installedAt": "2026-02-21T15:07:02.387Z",
+      "updatedAt": "2026-02-21T15:07:02.387Z"
     }
   },
   "dismissed": {
@@ -53,6 +26,7 @@
   "lastSelectedAgents": [
     "amp",
     "codex",
+    "cursor",
     "gemini-cli",
     "github-copilot",
     "kimi-cli",

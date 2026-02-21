@@ -32,6 +32,13 @@ nul
 .config/llm-mux/auth/**
 .config/llm-mux/credentials.json
 
+# OpenCode runtime/build/state (keep curated config only)
+.config/opencode/.opencode/**
+.config/opencode/.overseer/**
+.config/opencode/usage-config.jsonc
+.config/opencode/plugins/**/dist/**
+.config/opencode/plugins/**/.opencode/**
+
 # SSH private material
 .ssh/id_*
 .ssh/*.key
