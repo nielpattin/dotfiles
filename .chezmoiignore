@@ -2,6 +2,9 @@
 **/node_modules/**
 **/.git/**
 
+# Repo docs only (do not deploy to home)
+README.md
+
 # OS/editor noise
 **/.DS_Store
 **/Thumbs.db
