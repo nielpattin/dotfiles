@@ -249,6 +249,14 @@ Measure-ProfileSection "PSReadLine" {
 }
 
 # ==============================================================================
+# Global Secret Environment Variables (chezmoi managed)
+# ==============================================================================
+$secretsFile = "$HOME/Documents/PowerShell/secrets.ps1"
+if (Test-Path $secretsFile) {
+    . $secretsFile
+}
+
+# ==============================================================================
 # OpenCode Environment Variables
 # ==============================================================================
 $env:OPENCODE_ENABLE_EXA = "1"

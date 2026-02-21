@@ -2,6 +2,7 @@
 "aqua:jesseduffield/lazygit" = "latest"
 bun = "latest"
 chezmoi = "2.69.4"
+gemini = "latest"
 gh = "latest"
 "github:trasta298/keifu" = "latest"
 go = "latest"
