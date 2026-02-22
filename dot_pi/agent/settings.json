@@ -24,15 +24,16 @@
         "-files-widget\\index.ts",
         "-ralph-wiggum\\index.ts",
         "-raw-paste\\index.ts",
-        "-tab-status\\tab-status.ts",
-        "-usage-extension\\index.ts"
+        "+usage-extension\\index.ts",
+        "+tab-status\\tab-status.ts"
       ],
       "skills": [
         "-extending-pi\\skill-creator\\SKILL.md",
         "+extending-pi\\SKILL.md",
         "+ralph-wiggum\\SKILL.md"
       ]
-    }
+    },
+    "git:github.com/nicobailon/pi-interactive-shell"
   ],
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
