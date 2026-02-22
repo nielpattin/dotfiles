@@ -283,6 +283,8 @@ chezmoi edit ~/.config/chezmoi/secrets.yaml
 
 # sync manual edits back to source
 chezmoi re-add ~/.config/mise/config.toml
+# or just re-add all changes
+chezmoi re-add
 
 # see source repo status
 cd ~/.local/share/chezmoi && git status --short
