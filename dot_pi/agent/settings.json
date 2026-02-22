@@ -9,7 +9,14 @@
   "transport": "sse",
   "packages": [
     "https://github.com/Whamp/pi-read-map",
-    "C:/Users/niel/.pi/agent/extensions-src/pi-amplike",
+    "git:github.com/nielpattin/pi-amplike",
+    {
+      "source": "git:github.com/marckrenn/pi-sub",
+      "extensions": [
+        "packages/sub-core/index.ts",
+        "packages/sub-bar/index.ts"
+      ]
+    },
     {
       "source": "git:github.com/tmustier/pi-extensions",
       "extensions": [
@@ -20,9 +27,5 @@
         "arcade/mario-not/mario-not.ts"
       ]
     }
-  ],
-  "extensions": [
-    "C:/Users/niel/.pi/agent/extensions-src/pi-sub/packages/sub-core/index.ts",
-    "C:/Users/niel/.pi/agent/extensions-src/pi-sub/packages/sub-bar/index.ts"
   ]
 }
