@@ -30,7 +30,6 @@ It covers:
 Install:
 - `git`
 - `chezmoi`
-- `age`
 
 You also need your **age private key** file available at:
 
@@ -59,7 +58,7 @@ Paste your private age identity there.
 ## 2.3 Apply managed files
 
 ```bash
-chezmoi apply
+chezmoi apply # sync source → your home directory.
 ```
 
 ## 2.4 Verify clean state
@@ -96,7 +95,7 @@ Useful flags:
 - `--template` for templated files
 - `--encrypt` for sensitive files
 
-### 4.2 You edited a managed target directly (very common)
+### 4.2 You edited a managed target directly (very common) (cuz you idiot)
 
 Example: you changed `~/.config/mise/config.toml`.
 
