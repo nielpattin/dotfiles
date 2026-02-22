@@ -42,7 +42,4 @@ nul
 .config/opencode/plugins/**/dist/**
 .config/opencode/plugins/**/.opencode/**
 
-# SSH private material
-.ssh/id_*
-.ssh/*.key
-.ssh/known_hosts
+# SSH is fully managed via encrypted entries (do not ignore)

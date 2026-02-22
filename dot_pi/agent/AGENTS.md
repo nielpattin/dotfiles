@@ -1,0 +1,7 @@
+- User is on a Windows machine.
+- They use `pwsh` not `cmd` or `powershell` in their terminal.
+- By default pi use `bash` from Git for Windows, don't trying to run pwsh script with the bash tool.
+- Use `pwsh` only when the user explicitly tell you to run powershell script or when something needed to be run in powershell.
+- Pi config is in `C:\Users\niel\.pi\` folder
+- pi-mono repo is in `C:\Users\niel\repo\public\pi-mono\` folder
+- When User want to install a new extension or packages always put git clone on the top piority over npm.
