@@ -679,7 +679,7 @@ class ModePromptEditor extends CustomEditor {
 		this.lockedBorder = true;
 	}
 
-	handleInput(data: string): void {
+	override handleInput(data: string): void {
 		const before = this.getSelectionSnapshot?.() ?? "";
 		super.handleInput(data);
 		const after = this.getSelectionSnapshot?.() ?? "";
@@ -688,7 +688,7 @@ class ModePromptEditor extends CustomEditor {
 		}
 	}
 
-	render(width: number): string[] {
+	override render(width: number): string[] {
 		const lines = super.render(width);
 		const mode = this.modeLabelProvider?.();
 		if (!mode) return lines;

@@ -74,9 +74,9 @@ export default function (pi: ExtensionAPI) {
 
     const skillMatch = rawText.match(skillPattern);
     if (skillMatch) {
-      const skillName = skillMatch[1];
+      const skillName = skillMatch[1] ?? "skill";
       prefix = `[${skillName}] `;
-      userPrompt = skillMatch[2].trim();
+      userPrompt = (skillMatch[2] ?? "").trim();
 
       if (!userPrompt) {
         named = true;

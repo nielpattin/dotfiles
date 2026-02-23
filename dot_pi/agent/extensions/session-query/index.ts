@@ -45,7 +45,8 @@ export default function (pi: ExtensionAPI) {
 				const match = text.match(/\*\*Query:\*\* (.+?)\n\n---\n\n([\s\S]+)/);
 
 				if (match) {
-					const [, query, answer] = match;
+					const query = match[1] ?? "";
+					const answer = match[2] ?? "";
 					container.addChild(new Text(theme.bold("Query: ") + theme.fg("accent", query), 0, 0));
 					container.addChild(new Spacer(1));
 					// Render the answer as markdown

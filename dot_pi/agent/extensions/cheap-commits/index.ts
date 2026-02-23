@@ -144,11 +144,13 @@ async function pickCheapestModel(
 
   if (cheapModels.length > 0) {
     const best = cheapModels[0];
-    return {
-      model: `${best.provider}/${best.id}`,
-      source: "auto",
-      cost: best.cost,
-    };
+    if (best) {
+      return {
+        model: `${best.provider}/${best.id}`,
+        source: "auto",
+        cost: best.cost,
+      };
+    }
   }
 
   // If no token-based models under threshold, look for "cheap-sounding" names
@@ -158,11 +160,13 @@ async function pickCheapestModel(
 
   if (cheapNamed.length > 0) {
     const best = cheapNamed[0];
-    return {
-      model: `${best.provider}/${best.id}`,
-      source: "auto",
-      cost: best.cost,
-    };
+    if (best) {
+      return {
+        model: `${best.provider}/${best.id}`,
+        source: "auto",
+        cost: best.cost,
+      };
+    }
   }
 
   // If no token-based models at all, use the cheapest token-based overall
@@ -171,11 +175,13 @@ async function pickCheapestModel(
       (a, b) => calculateCostScore(a) - calculateCostScore(b),
     );
     const best = sorted[0];
-    return {
-      model: `${best.provider}/${best.id}`,
-      source: "auto",
-      cost: best.cost,
-    };
+    if (best) {
+      return {
+        model: `${best.provider}/${best.id}`,
+        source: "auto",
+        cost: best.cost,
+      };
+    }
   }
 
   // Last resort: use request-based models (GitHub Copilot, etc.)
@@ -183,11 +189,15 @@ async function pickCheapestModel(
     (a, b) => calculateCostScore(a) - calculateCostScore(b),
   );
   const best = sorted[0];
-  return {
-    model: `${best.provider}/${best.id}`,
-    source: "auto",
-    cost: best.cost,
-  };
+  if (best) {
+    return {
+      model: `${best.provider}/${best.id}`,
+      source: "auto",
+      cost: best.cost,
+    };
+  }
+
+  return { model: HARD_FALLBACK_MODEL, source: "auto", cost: null };
 }
 
 /**
@@ -259,11 +269,17 @@ function getAgentNameFromFile(filePath: string): string | null {
     if (!frontmatter) {
       return path.basename(filePath, ".md");
     }
-    const nameMatch = frontmatter[1].match(/^name:\s*(.+)$/m);
-    if (!nameMatch) {
+    const frontmatterBody = frontmatter[1];
+    if (!frontmatterBody) {
       return path.basename(filePath, ".md");
     }
-    return stripQuotes(nameMatch[1]);
+
+    const nameMatch = frontmatterBody.match(/^name:\s*(.+)$/m);
+    const rawName = nameMatch?.[1];
+    if (!rawName) {
+      return path.basename(filePath, ".md");
+    }
+    return stripQuotes(rawName);
   } catch {
     return null;
   }
@@ -323,7 +339,8 @@ function chooseAgent(cwd: string): string {
     if (all.includes(preferred)) return preferred;
   }
 
-  if (all.length > 0) return all[0];
+  const first = all[0];
+  if (first) return first;
   return ensureFallbackAgent();
 }
 
@@ -350,6 +367,12 @@ type PickerItem =
       costLabel: string;
       model: ModelInfo;
     };
+
+function isModelItem(
+  item: PickerItem | undefined,
+): item is Extract<PickerItem, { type: "model" }> {
+  return item?.type === "model";
+}
 
 /**
  * Display a formatted model selection widget with colors, alignment, and sorting.
@@ -383,7 +406,11 @@ async function selectModelInteractive(
       const fuzzyMatch = (text: string, query: string): boolean => {
         let queryIdx = 0;
         for (let i = 0; i < text.length && queryIdx < query.length; i++) {
-          if (text[i].toLowerCase() === query[queryIdx].toLowerCase()) {
+          const textChar = text[i];
+          const queryChar = query[queryIdx];
+          if (!textChar || !queryChar) continue;
+
+          if (textChar.toLowerCase() === queryChar.toLowerCase()) {
             queryIdx++;
           }
         }
@@ -480,7 +507,7 @@ async function selectModelInteractive(
       // Find first selectable index
       const findFirstSelectable = (items: PickerItem[]): number => {
         for (let i = 0; i < items.length; i++) {
-          if (items[i].type === "model") return i;
+          if (items[i]?.type === "model") return i;
         }
         return 0;
       };
@@ -610,6 +637,8 @@ async function selectModelInteractive(
 
             for (let vi = 0; vi < visibleItems.length; vi++) {
               const item = visibleItems[vi];
+              if (!item) continue;
+
               const actualIndex = scrollOffset + vi;
 
               if (item.type === "separator") {
@@ -673,7 +702,7 @@ async function selectModelInteractive(
 
           // Preview footer for selected model
           const selectedItem = items[selectedIndex];
-          if (selectedItem?.type === "model") {
+          if (isModelItem(selectedItem)) {
             lines.push(row(""));
             lines.push(row(" " + theme.fg("accent", selectedItem.modelId)));
             lines.push(row(" " + theme.fg("muted", selectedItem.costLabel)));
@@ -736,7 +765,7 @@ async function selectModelInteractive(
           if (matchesKey(data, "enter") || matchesKey(data, "space")) {
             // Enter or Space - select current model
             const item = items[selectedIndex];
-            if (item?.type === "model") {
+            if (isModelItem(item)) {
               done(item.modelId);
             }
           } else if (data.toLowerCase() === "n") {
@@ -877,16 +906,22 @@ export default async function generateCommitMessageExtension(pi: ExtensionAPI) {
       }
     }
 
+    const finalModel = selectedModel;
+    if (!finalModel) {
+      ctx.ui.notify("Model selection cancelled", "warning");
+      return;
+    }
+
     // Write configuration using shared config service
     try {
-      await configService.set("mode", selectedModel, "home");
+      await configService.set("mode", finalModel, "home");
       await configService.save("home");
 
       if (ctx.hasUI) {
-        const cost = await getModelCost(ctx, selectedModel);
+        const cost = await getModelCost(ctx, finalModel);
         const costLabel = formatCost(cost);
         ctx.ui.notify(
-          `✓ Model configured: ${selectedModel} — ${costLabel}`,
+          `✓ Model configured: ${finalModel} — ${costLabel}`,
           "info",
         );
       }

@@ -300,8 +300,12 @@ function matchesCmd(pattern: string | string[], command: string): boolean {
 	// Regex literal: /pattern/ or /pattern/flags
 	const regexMatch = pattern.match(/^\/(.+)\/([gimsuy]*)$/);
 	if (regexMatch) {
+		const source = regexMatch[1];
+		if (!source) return false;
+
+		const flags = regexMatch[2] ?? "";
 		try {
-			return new RegExp(regexMatch[1], regexMatch[2]).test(command);
+			return new RegExp(source, flags).test(command);
 		} catch {
 			return false;
 		}
