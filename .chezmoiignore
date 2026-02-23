@@ -25,15 +25,13 @@ nul
 .pi/agent/auth.json
 .pi/agent/sessions/**
 .pi/agent/cache/**
-.pi/agent/extensions-src/**
 .pi/agent/git/**
+.pi/bin/**
 
 # Secret/token-heavy app state
 .config/configstore/**
 .config/github-copilot/apps.json
 .config/github-copilot/db/**
-.config/llm-mux/auth/**
-.config/llm-mux/credentials.json
 
 # OpenCode runtime/build/state (keep curated config only)
 .config/opencode/.opencode/**

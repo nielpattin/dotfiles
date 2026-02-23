@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.54.1",
+  "lastChangelogVersion": "0.54.2",
   "hideThinkingBlock": false,
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
@@ -9,7 +9,6 @@
   "transport": "sse",
   "packages": [
     "https://github.com/Whamp/pi-read-map",
-    "git:github.com/nielpattin/pi-amplike",
     "git:github.com/marckrenn/pi-sub",
     {
       "source": "git:github.com/tmustier/pi-extensions",
@@ -33,7 +32,8 @@
         "+ralph-wiggum\\SKILL.md"
       ]
     },
-    "git:github.com/nicobailon/pi-interactive-shell"
+    "git:github.com/nicobailon/pi-interactive-shell",
+    "git:github.com/nicobailon/pi-subagents"
   ],
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
@@ -42,6 +42,13 @@
   ],
   "extensions": [
     "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-core\\index.ts",
-    "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-bar\\index.ts"
+    "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-bar\\index.ts",
+    "+extensions\\tools.ts",
+    "+extensions\\cheap-commits\\index.ts",
+    "+extensions\\smart-sessions\\index.ts",
+    "+extensions\\handoff\\index.ts",
+    "+extensions\\modes\\index.ts",
+    "+extensions\\permissions\\index.ts",
+    "+extensions\\session-query\\index.ts"
   ]
 }
