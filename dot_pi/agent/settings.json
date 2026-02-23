@@ -4,7 +4,7 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
-  "defaultThinkingLevel": "xhigh",
+  "defaultThinkingLevel": "high",
   "theme": "dark",
   "transport": "sse",
   "packages": [
@@ -42,11 +42,11 @@
     "-skills\\web-search\\SKILL.md",
     "-skills\\visit-webpage\\SKILL.md",
     "-..\\..\\.agents\\skills\\create-rule\\SKILL.md",
-    "+..\\..\\.agents\\skills\\commit-message-generator\\SKILL.md",
     "+..\\..\\.agents\\skills\\git-expert\\SKILL.md",
     "-..\\..\\.agents\\skills\\landing-page\\SKILL.md",
     "-..\\..\\.agents\\skills\\meme-factory\\SKILL.md",
-    "-..\\..\\.agents\\skills\\roadmap\\SKILL.md"
+    "-..\\..\\.agents\\skills\\roadmap\\SKILL.md",
+    "-..\\..\\.agents\\skills\\commit-message-generator\\SKILL.md"
   ],
   "extensions": [
     "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-core\\index.ts",
@@ -68,5 +68,7 @@
     "autoResize": true
   },
   "showHardwareCursor": false,
-  "doubleEscapeAction": "tree"
+  "doubleEscapeAction": "tree",
+  "workingVibeMode": "file",
+  "workingVibeRefreshInterval": 5
 }
