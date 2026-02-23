@@ -4,7 +4,7 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "xhigh",
   "theme": "dark",
   "transport": "sse",
   "packages": [
@@ -38,7 +38,15 @@
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
     "-..\\..\\.agents\\skills\\prd-task\\SKILL.md",
-    "-..\\..\\.agents\\skills\\playwright-expert\\SKILL.md"
+    "-..\\..\\.agents\\skills\\playwright-expert\\SKILL.md",
+    "-skills\\web-search\\SKILL.md",
+    "-skills\\visit-webpage\\SKILL.md",
+    "-..\\..\\.agents\\skills\\create-rule\\SKILL.md",
+    "+..\\..\\.agents\\skills\\commit-message-generator\\SKILL.md",
+    "+..\\..\\.agents\\skills\\git-expert\\SKILL.md",
+    "-..\\..\\.agents\\skills\\landing-page\\SKILL.md",
+    "-..\\..\\.agents\\skills\\meme-factory\\SKILL.md",
+    "-..\\..\\.agents\\skills\\roadmap\\SKILL.md"
   ],
   "extensions": [
     "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-core\\index.ts",
@@ -47,8 +55,18 @@
     "+extensions\\cheap-commits\\index.ts",
     "+extensions\\smart-sessions\\index.ts",
     "+extensions\\handoff\\index.ts",
-    "+extensions\\modes\\index.ts",
     "+extensions\\permissions\\index.ts",
-    "+extensions\\session-query\\index.ts"
-  ]
+    "+extensions\\session-query\\index.ts",
+    "-extensions\\modes\\index.ts"
+  ],
+  "workingVibeModel": "openai-codex/gpt-5.3-codex",
+  "workingVibe": "game-dev",
+  "compaction": {
+    "enabled": false
+  },
+  "images": {
+    "autoResize": true
+  },
+  "showHardwareCursor": false,
+  "doubleEscapeAction": "tree"
 }
