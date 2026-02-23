@@ -57,7 +57,8 @@
     "+extensions\\handoff\\index.ts",
     "+extensions\\permissions\\index.ts",
     "+extensions\\session-query\\index.ts",
-    "-extensions\\modes\\index.ts"
+    "-extensions\\modes\\index.ts",
+    "-extensions\\image-paste-ui.ts"
   ],
   "workingVibeModel": "openai-codex/gpt-5.3-codex",
   "workingVibe": "game-dev",

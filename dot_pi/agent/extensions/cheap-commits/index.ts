@@ -36,7 +36,8 @@ const USER_AGENTS_DIR = path.join(homedir(), ".pi", "agent", "agents");
 const CONFIG_NAME = "generate-commit-message";
 
 const DEFAULT_PROMPT = `
-Use the writing-git-commits skill to commit unstaged and staged changes in the current repository.
+Use the writing-git-commits skill to commit unstaged and staged changes in the current repository only.
+Do not switch to another repository unless the user explicitly asks.
 Only stop for human input if there is a blocker. Otherwise generate and stage commits until all changes are committed.
 `.trim();
 
@@ -847,7 +848,12 @@ async function generateCommitCommand(
     }
   }
 
-  const prompt = buildPrompt(config, args);
+  const basePrompt = buildPrompt(config, args);
+  const repositoryGuard = [
+    `Operate only in this repository: ${ctx.cwd}`,
+    "Do not cd into any other repository unless the user explicitly asks.",
+  ].join("\n");
+  const prompt = `${basePrompt}\n\n${repositoryGuard}`;
   const agent = chooseAgent(ctx.cwd);
 
   const payload = {
@@ -857,6 +863,7 @@ async function generateCommitCommand(
     skill: DEFAULT_SKILL,
     clarify: false,
     agentScope: "both",
+    cwd: ctx.cwd,
   };
 
   // Provide user feedback
