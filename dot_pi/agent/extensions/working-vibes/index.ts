@@ -55,8 +55,13 @@ export default function workingVibesExtension(pi: ExtensionAPI) {
     onVibeBeforeAgentStart(event.prompt, ctx.ui.setWorkingMessage);
   });
 
-  pi.on("agent_start", async () => {
-    onVibeAgentStart();
+  pi.on("agent_start", async (_event, ctx) => {
+    if (!ctx.hasUI) {
+      onVibeAgentStart();
+      return;
+    }
+
+    onVibeAgentStart(ctx.ui.setWorkingMessage);
   });
 
   pi.on("tool_call", async (event, ctx) => {

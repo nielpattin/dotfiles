@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 export type VibeMode = "generate" | "file";
 
-const DEFAULT_MODEL = " openai-codex/gpt-5.3-codex";
+const DEFAULT_MODEL = "openai-codex/gpt-5.3-codex";
 
 const DEFAULT_PROMPT = `Generate a 2-4 word "{theme}" themed loading message ending in "...".
 
@@ -53,6 +53,33 @@ let vibeIndex = 0;
 
 const MAX_RECENT_VIBES = 5;
 let recentVibes: string[] = [];
+
+let fileModeTicker: ReturnType<typeof setInterval> | null = null;
+
+function stopFileModeTicker(): void {
+  if (fileModeTicker) {
+    clearInterval(fileModeTicker);
+    fileModeTicker = null;
+  }
+}
+
+function startFileModeTicker(setWorkingMessage: (msg?: string) => void): void {
+  stopFileModeTicker();
+
+  if (!isStreaming || !config.theme || config.mode !== "file") {
+    return;
+  }
+
+  const intervalMs = Math.max(1000, config.refreshInterval);
+  fileModeTicker = setInterval(() => {
+    if (!isStreaming || !config.theme || config.mode !== "file") {
+      stopFileModeTicker();
+      return;
+    }
+
+    updateVibeFromFile(setWorkingMessage);
+  }, intervalMs);
+}
 
 function getSettingsPath(): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
@@ -345,6 +372,10 @@ async function generateAndUpdate(prompt: string, setWorkingMessage: (msg?: strin
 export function initVibeManager(ctx: ExtensionContext): void {
   extensionCtx = ctx;
   config = loadConfig();
+
+  if (!config.theme || config.mode !== "file") {
+    stopFileModeTicker();
+  }
 }
 
 export function getVibeTheme(): string | null {
@@ -354,6 +385,9 @@ export function getVibeTheme(): string | null {
 export function setVibeTheme(theme: string | null): void {
   config = { ...config, theme };
   recentVibes = [];
+  if (!theme) {
+    stopFileModeTicker();
+  }
   saveThemeConfig();
 }
 
@@ -372,6 +406,9 @@ export function getVibeMode(): VibeMode {
 
 export function setVibeMode(mode: VibeMode): void {
   config = { ...config, mode };
+  if (mode !== "file") {
+    stopFileModeTicker();
+  }
   saveModeConfig();
 }
 
@@ -383,8 +420,14 @@ export function onVibeBeforeAgentStart(prompt: string, setWorkingMessage: (msg?:
   void generateAndUpdate(prompt, setWorkingMessage);
 }
 
-export function onVibeAgentStart(): void {
+export function onVibeAgentStart(setWorkingMessage?: (msg?: string) => void): void {
   isStreaming = true;
+
+  if (setWorkingMessage && config.mode === "file" && config.theme) {
+    // Immediately rotate once on stream start, then keep rotating periodically.
+    updateVibeFromFile(setWorkingMessage);
+    startFileModeTicker(setWorkingMessage);
+  }
 }
 
 export function onVibeToolCall(
@@ -394,6 +437,14 @@ export function onVibeToolCall(
   agentContext?: string,
 ): void {
   if (!config.theme || !extensionCtx || !isStreaming) return;
+
+  // File mode rotates via timer for smooth cadence (e.g., every 1s).
+  if (config.mode === "file") {
+    if (!fileModeTicker) {
+      startFileModeTicker(setWorkingMessage);
+    }
+    return;
+  }
 
   const now = Date.now();
   if (now - lastVibeTime < config.refreshInterval) return;
@@ -421,6 +472,7 @@ export function onVibeToolCall(
 
 export function onVibeAgentEnd(setWorkingMessage: (msg?: string) => void): void {
   isStreaming = false;
+  stopFileModeTicker();
   currentGeneration?.abort();
   setWorkingMessage(undefined);
 }
