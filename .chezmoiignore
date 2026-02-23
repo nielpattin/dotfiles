@@ -1,7 +1,18 @@
 # Build / dependency junk
 **/node_modules/**
 **/.git/**
-
+**/tmp/**
+**/dist/**
+**/build/**
+**/target/**
+**/vendor/**
+**/bin/**
+**/obj/**
+**/out/**
+**/coverage/**
+**/.cache/**
+**/.idea/**
+**/.vscode/**
 # Repo docs only (do not deploy to home)
 README.md
 
