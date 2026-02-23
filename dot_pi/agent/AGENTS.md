@@ -2,6 +2,7 @@
 - They use `pwsh` not `cmd` or `powershell` in their terminal.
 - By default pi use `bash` from Git for Windows, don't trying to run pwsh script with the bash tool.
 - Use `pwsh` only when the user explicitly tell you to run powershell script or when something needed to be run in powershell.
-- Pi config is in `C:\Users\niel\.pi\` folder
+- Pi coding agent config is in `C:\Users\niel\.pi\` folder so if user want to change something about extensions, skills, or agent settings, always check that folder first.
 - pi-mono repo is in `C:\Users\niel\repo\public\pi-mono\` folder
 - When User want to install a new extension or packages always put git clone on the top piority over npm.
+- Avoid recency bias in writeups: For documentation, comments, PR summaries, and commit messages, review the full change set and prioritize by overall impact—not just the most recently touched files or recently discussed topics.
