@@ -2,19 +2,24 @@
  * Prompt Stash Extension
  *
  * Primary UX:
- * - Ctrl+S opens a centered dialog with:
+ * - /stash-list opens a centered dialog with:
  *   1) Stash this (current editor prompt)
  *   2) Show prompts list
+ * - Registers Prompt Stash actions in the modular command palette section
  *
- * Prompt list supports:
- * - Pop to editor (remove from stash)
- * - Paste to editor (keep in stash)
- * - Delete item
- * - Clear all
+ * Persistence:
+ * - Global file: ~/.pi/agent/prompt-stash.jsonl
+ * - JSONL format, one stash item per line
  */
+
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
 
 import type { ExtensionAPI, ExtensionContext, Theme } from "@mariozechner/pi-coding-agent";
 import { matchesKey, type SelectItem, truncateToWidth, visibleWidth } from "@mariozechner/pi-tui";
+
+import { registerCommandPaletteProvider } from "./command-palette/registry.js";
 
 interface StashItem {
 	id: number;
@@ -22,14 +27,15 @@ interface StashItem {
 	createdAt: number;
 }
 
-interface StashSnapshot {
-	action: "stash" | "pop" | "delete" | "clear";
-	items: StashItem[];
-	nextId: number;
+// Legacy session-persisted shape, used for one-time migration fallback.
+interface LegacyStashSnapshot {
+	items?: unknown;
+	nextId?: unknown;
 }
 
-const ENTRY_TYPE = "prompt-stash";
 const PREVIEW_MAX = 90;
+const MAX_STASH_ENTRIES = 50;
+const STASH_PATH = join(homedir(), ".pi", "agent", "prompt-stash.jsonl");
 
 function oneLine(text: string): string {
 	return text.replace(/\s+/g, " ").trim();
@@ -49,6 +55,61 @@ function isValidItem(value: unknown): value is StashItem {
 	if (!value || typeof value !== "object") return false;
 	const item = value as Partial<StashItem>;
 	return typeof item.id === "number" && typeof item.text === "string" && typeof item.createdAt === "number";
+}
+
+function ensureStashDir(): void {
+	mkdirSync(dirname(STASH_PATH), { recursive: true });
+}
+
+function writeAll(items: StashItem[]): void {
+	ensureStashDir();
+	const content = items.length > 0 ? `${items.map((item) => JSON.stringify(item)).join("\n")}\n` : "";
+	writeFileSync(STASH_PATH, content, "utf-8");
+}
+
+function appendOne(item: StashItem): boolean {
+	try {
+		ensureStashDir();
+		appendFileSync(STASH_PATH, `${JSON.stringify(item)}\n`, "utf-8");
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+function loadFromDisk(): { items: StashItem[]; needsRewrite: boolean } {
+	if (!existsSync(STASH_PATH)) {
+		return { items: [], needsRewrite: false };
+	}
+
+	let text = "";
+	try {
+		text = readFileSync(STASH_PATH, "utf-8");
+	} catch {
+		return { items: [], needsRewrite: false };
+	}
+
+	const parsed: StashItem[] = [];
+	let hadInvalid = false;
+
+	for (const line of text.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed) continue;
+		try {
+			const value = JSON.parse(trimmed) as unknown;
+			if (!isValidItem(value)) {
+				hadInvalid = true;
+				continue;
+			}
+			parsed.push({ ...value });
+		} catch {
+			hadInvalid = true;
+		}
+	}
+
+	const limited = parsed.slice(-MAX_STASH_ENTRIES);
+	const trimmed = limited.length !== parsed.length;
+	return { items: limited, needsRewrite: hadInvalid || trimmed };
 }
 
 class CenterMenuDialog {
@@ -169,37 +230,46 @@ class CenterMenuDialog {
 export default function promptStashExtension(pi: ExtensionAPI) {
 	let items: StashItem[] = [];
 	let nextId = 1;
+	let loaded = false;
 
-	function persist(action: StashSnapshot["action"]) {
-		pi.appendEntry<StashSnapshot>(ENTRY_TYPE, {
-			action,
-			items: [...items],
-			nextId,
-		});
+	function recomputeNextId(): void {
+		nextId = items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
 	}
 
-	function restoreFromBranch(ctx: ExtensionContext) {
-		items = [];
-		nextId = 1;
-
+	function migrateFromLegacySession(ctx: ExtensionContext): void {
+		let migrated: StashItem[] = [];
 		for (const entry of ctx.sessionManager.getBranch()) {
-			if (entry.type !== "custom" || entry.customType !== ENTRY_TYPE) continue;
-			const data = entry.data as Partial<StashSnapshot> | undefined;
-			if (!data) continue;
+			if (entry.type !== "custom" || entry.customType !== "prompt-stash") continue;
+			const data = entry.data as LegacyStashSnapshot | undefined;
+			if (!data || !Array.isArray(data.items)) continue;
+			migrated = data.items.filter(isValidItem).map((item) => ({ ...item }));
+		}
 
-			if (Array.isArray(data.items)) {
-				items = data.items.filter(isValidItem).map((item) => ({ ...item }));
-			}
+		if (migrated.length === 0) return;
+		items = migrated.slice(-MAX_STASH_ENTRIES);
+		recomputeNextId();
+		writeAll(items);
+		ctx.ui.notify(`Migrated ${items.length} prompt stash item(s) to ${STASH_PATH}`, "info");
+	}
 
-			if (typeof data.nextId === "number" && Number.isFinite(data.nextId) && data.nextId > 0) {
-				nextId = Math.floor(data.nextId);
-			} else {
-				nextId = items.reduce((max, item) => Math.max(max, item.id), 0) + 1;
-			}
+	function ensureLoaded(ctx?: ExtensionContext): void {
+		if (loaded) return;
+		loaded = true;
+
+		const fromDisk = loadFromDisk();
+		items = fromDisk.items;
+		recomputeNextId();
+		if (fromDisk.needsRewrite) {
+			writeAll(items);
+		}
+
+		if (items.length === 0 && ctx) {
+			migrateFromLegacySession(ctx);
 		}
 	}
 
 	function stashPrompt(rawText: string, ctx: ExtensionContext): boolean {
+		ensureLoaded(ctx);
 		const text = rawText.trim();
 		if (!text) {
 			ctx.ui.notify("Prompt is empty. Nothing stashed.", "warning");
@@ -211,8 +281,18 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 			text,
 			createdAt: Date.now(),
 		};
+
 		items.push(item);
-		persist("stash");
+		let trimmed = false;
+		if (items.length > MAX_STASH_ENTRIES) {
+			items = items.slice(-MAX_STASH_ENTRIES);
+			trimmed = true;
+		}
+
+		if (trimmed || !appendOne(item)) {
+			writeAll(items);
+		}
+
 		ctx.ui.notify(`Stashed #${item.id}: ${preview(item.text)}`, "info");
 		return true;
 	}
@@ -228,16 +308,16 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 		return items.find((item) => item.id === id);
 	}
 
-	function popToEditor(item: StashItem, ctx: ExtensionContext) {
+	function popToEditor(item: StashItem, ctx: ExtensionContext): void {
 		ctx.ui.setEditorText(item.text);
 		removeById(item.id);
-		persist("pop");
+		writeAll(items);
 		ctx.ui.notify(`Popped #${item.id} into editor`, "info");
 	}
 
-	function deleteItem(item: StashItem, ctx: ExtensionContext) {
+	function deleteItem(item: StashItem, ctx: ExtensionContext): void {
 		removeById(item.id);
-		persist("delete");
+		writeAll(items);
 		ctx.ui.notify(`Deleted #${item.id} from stash`, "info");
 	}
 
@@ -277,7 +357,8 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 		);
 	}
 
-	function stashCurrentEditorPrompt(ctx: ExtensionContext) {
+	function stashCurrentEditorPrompt(ctx: ExtensionContext): void {
+		ensureLoaded(ctx);
 		const draft = ctx.ui.getEditorText().trim();
 		if (!draft || draft.startsWith("/")) {
 			ctx.ui.notify("Editor has no prompt draft to stash", "warning");
@@ -290,6 +371,7 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 	}
 
 	async function openPromptListDialog(ctx: ExtensionContext): Promise<void> {
+		ensureLoaded(ctx);
 		if (!ctx.hasUI) {
 			ctx.ui.notify("Prompt stash list requires interactive mode", "error");
 			return;
@@ -316,7 +398,7 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 			if (!ok) return;
 			items = [];
 			nextId = 1;
-			persist("clear");
+			writeAll(items);
 			ctx.ui.notify("Cleared prompt stash", "info");
 			return;
 		}
@@ -353,6 +435,7 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 	}
 
 	async function openMainDialog(ctx: ExtensionContext): Promise<void> {
+		ensureLoaded(ctx);
 		if (!ctx.hasUI) {
 			ctx.ui.notify("Prompt stash requires interactive mode", "error");
 			return;
@@ -374,6 +457,34 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 		}
 	}
 
+	const unregisterPaletteProvider = registerCommandPaletteProvider({
+		id: "prompt-stash",
+		section: "Prompt Stash",
+		source: "prompt-stash",
+		order: 10,
+		getActions: (ctx) => {
+			ensureLoaded(ctx);
+			return [
+				{
+					id: "stash-current",
+					label: "Stash this",
+					description: "Save current editor prompt",
+					invoke: (callCtx) => {
+						stashCurrentEditorPrompt(callCtx);
+					},
+				},
+				{
+					id: "show-list",
+					label: "Show prompts list",
+					description: `Manage stashed prompts (${items.length})`,
+					invoke: async (callCtx) => {
+						await openPromptListDialog(callCtx);
+					},
+				},
+			];
+		},
+	});
+
 	pi.registerCommand("stash-list", {
 		description: "Open centered prompt stash dialog",
 		handler: async (_args, ctx) => {
@@ -391,6 +502,7 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 			return filtered.length > 0 ? filtered : null;
 		},
 		handler: async (args, ctx) => {
+			ensureLoaded(ctx);
 			if (!ctx.hasUI) {
 				ctx.ui.notify("/pop requires interactive mode", "error");
 				return;
@@ -424,23 +536,12 @@ export default function promptStashExtension(pi: ExtensionAPI) {
 		},
 	});
 
-	pi.registerShortcut("ctrl+s", {
-		description: "Prompt stash dialog",
-		handler: async (ctx) => {
-			await openMainDialog(ctx);
-		},
+	pi.on("session_start", async (_event, ctx) => {
+		loaded = false;
+		ensureLoaded(ctx);
 	});
 
-	pi.on("session_start", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
-	pi.on("session_switch", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
-	pi.on("session_fork", async (_event, ctx) => {
-		restoreFromBranch(ctx);
-	});
-	pi.on("session_tree", async (_event, ctx) => {
-		restoreFromBranch(ctx);
+	pi.on("session_shutdown", async () => {
+		unregisterPaletteProvider();
 	});
 }
