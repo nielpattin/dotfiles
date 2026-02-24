@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import {
   generateVibesBatch,
   getVibeFileCount,
@@ -15,31 +15,6 @@ import {
   setVibeModel,
   setVibeTheme,
 } from "./manager.js";
-
-function getRecentAgentContext(ctx: ExtensionContext): string | undefined {
-  const branch = ctx.sessionManager.getBranch();
-
-  for (let i = branch.length - 1; i >= 0; i--) {
-    const event = branch[i];
-    if (!event) continue;
-
-    if (event.type === "message" && event.message?.role === "assistant") {
-      const content = event.message.content;
-      if (!Array.isArray(content)) continue;
-
-      for (const block of content) {
-        if (block.type === "text" && block.text) {
-          const text = block.text.trim();
-          if (text.length > 0) {
-            return text.slice(0, 200);
-          }
-        }
-      }
-    }
-  }
-
-  return undefined;
-}
 
 export default function workingVibesExtension(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
@@ -66,13 +41,7 @@ export default function workingVibesExtension(pi: ExtensionAPI) {
 
   pi.on("tool_call", async (event, ctx) => {
     if (!ctx.hasUI) return;
-    const recent = getRecentAgentContext(ctx);
-    onVibeToolCall(
-      event.toolName,
-      (event.input ?? {}) as Record<string, unknown>,
-      ctx.ui.setWorkingMessage,
-      recent,
-    );
+    onVibeToolCall(event.toolName, (event.input ?? {}) as Record<string, unknown>, ctx.ui.setWorkingMessage);
   });
 
   pi.on("agent_end", async (_event, ctx) => {

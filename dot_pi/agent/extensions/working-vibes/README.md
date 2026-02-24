@@ -2,7 +2,7 @@
 
 AI-powered themed working messages for Pi.
 
-This extension adds `/vibe` and dynamically changes the "Working..." message to match a theme (e.g. `pirate`, `star trek`, `zen`, `noir`).
+This extension adds `/vibe` and sets a themed "Working..." message once per turn (e.g. `pirate`, `star trek`, `zen`, `noir`).
 
 ---
 
@@ -13,7 +13,7 @@ This extension adds `/vibe` and dynamically changes the "Working..." message to 
 - `/vibe mode generate|file`
 - `/vibe model <provider/modelId>`
 - `/vibe generate <theme> [count]` to pre-generate vibe files
-- Context-aware refreshes during long tool runs (rate-limited)
+- Event-based vibes (no timer): update at turn start, and in file mode also on tool calls
 - File mode for instant, offline, zero-cost vibes
 
 ---
@@ -47,7 +47,6 @@ Configured via `~/.pi/agent/settings.json`:
   "workingVibeMode": "generate",
   "workingVibeModel": "anthropic/claude-haiku-4-5",
   "workingVibeFallback": "Working",
-  "workingVibeRefreshInterval": 30,
   "workingVibePrompt": "Generate a {theme} loading message for: {task}",
   "workingVibeMaxLength": 65
 }

@@ -30,7 +30,6 @@ interface VibeConfig {
   modelSpec: string;
   fallback: string;
   timeout: number;
-  refreshInterval: number;
   promptTemplate: string;
   maxLength: number;
 }
@@ -44,7 +43,6 @@ let config: VibeConfig = loadConfig();
 let extensionCtx: ExtensionContext | null = null;
 let currentGeneration: AbortController | null = null;
 let isStreaming = false;
-let lastVibeTime = 0;
 
 let vibeCache: string[] = [];
 let vibeCacheTheme: string | null = null;
@@ -53,33 +51,6 @@ let vibeIndex = 0;
 
 const MAX_RECENT_VIBES = 5;
 let recentVibes: string[] = [];
-
-let fileModeTicker: ReturnType<typeof setInterval> | null = null;
-
-function stopFileModeTicker(): void {
-  if (fileModeTicker) {
-    clearInterval(fileModeTicker);
-    fileModeTicker = null;
-  }
-}
-
-function startFileModeTicker(setWorkingMessage: (msg?: string) => void): void {
-  stopFileModeTicker();
-
-  if (!isStreaming || !config.theme || config.mode !== "file") {
-    return;
-  }
-
-  const intervalMs = Math.max(1000, config.refreshInterval);
-  fileModeTicker = setInterval(() => {
-    if (!isStreaming || !config.theme || config.mode !== "file") {
-      stopFileModeTicker();
-      return;
-    }
-
-    updateVibeFromFile(setWorkingMessage);
-  }, intervalMs);
-}
 
 function getSettingsPath(): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
@@ -110,10 +81,6 @@ function loadConfig(): VibeConfig {
     modelSpec: typeof settings.workingVibeModel === "string" ? settings.workingVibeModel : DEFAULT_MODEL,
     fallback: typeof settings.workingVibeFallback === "string" ? settings.workingVibeFallback : "Working",
     timeout: 3000,
-    refreshInterval:
-      typeof settings.workingVibeRefreshInterval === "number"
-        ? settings.workingVibeRefreshInterval * 1000
-        : 30000,
     promptTemplate:
       typeof settings.workingVibePrompt === "string" ? settings.workingVibePrompt : DEFAULT_PROMPT,
     maxLength: typeof settings.workingVibeMaxLength === "number" ? settings.workingVibeMaxLength : 65,
@@ -372,10 +339,6 @@ async function generateAndUpdate(prompt: string, setWorkingMessage: (msg?: strin
 export function initVibeManager(ctx: ExtensionContext): void {
   extensionCtx = ctx;
   config = loadConfig();
-
-  if (!config.theme || config.mode !== "file") {
-    stopFileModeTicker();
-  }
 }
 
 export function getVibeTheme(): string | null {
@@ -385,9 +348,6 @@ export function getVibeTheme(): string | null {
 export function setVibeTheme(theme: string | null): void {
   config = { ...config, theme };
   recentVibes = [];
-  if (!theme) {
-    stopFileModeTicker();
-  }
   saveThemeConfig();
 }
 
@@ -406,17 +366,17 @@ export function getVibeMode(): VibeMode {
 
 export function setVibeMode(mode: VibeMode): void {
   config = { ...config, mode };
-  if (mode !== "file") {
-    stopFileModeTicker();
-  }
   saveModeConfig();
 }
 
 export function onVibeBeforeAgentStart(prompt: string, setWorkingMessage: (msg?: string) => void): void {
   if (!config.theme || !extensionCtx) return;
 
+  if (config.mode === "file") {
+    return;
+  }
+
   setWorkingMessage(`Channeling ${config.theme}...`);
-  lastVibeTime = Date.now();
   void generateAndUpdate(prompt, setWorkingMessage);
 }
 
@@ -424,55 +384,25 @@ export function onVibeAgentStart(setWorkingMessage?: (msg?: string) => void): vo
   isStreaming = true;
 
   if (setWorkingMessage && config.mode === "file" && config.theme) {
-    // Immediately rotate once on stream start, then keep rotating periodically.
     updateVibeFromFile(setWorkingMessage);
-    startFileModeTicker(setWorkingMessage);
   }
 }
 
 export function onVibeToolCall(
-  toolName: string,
-  toolInput: Record<string, unknown>,
+  _toolName: string,
+  _toolInput: Record<string, unknown>,
   setWorkingMessage: (msg?: string) => void,
-  agentContext?: string,
 ): void {
   if (!config.theme || !extensionCtx || !isStreaming) return;
 
-  // File mode rotates via timer for smooth cadence (e.g., every 1s).
+  // Event-based only: rotate on each tool call (no timer).
   if (config.mode === "file") {
-    if (!fileModeTicker) {
-      startFileModeTicker(setWorkingMessage);
-    }
-    return;
+    updateVibeFromFile(setWorkingMessage);
   }
-
-  const now = Date.now();
-  if (now - lastVibeTime < config.refreshInterval) return;
-
-  let hint: string;
-  if (agentContext && agentContext.length > 10) {
-    hint = agentContext.slice(0, 150);
-  } else {
-    hint = `using ${toolName} tool`;
-    if (toolName === "read" && toolInput.path) {
-      hint = `reading file: ${String(toolInput.path)}`;
-    } else if (toolName === "write" && toolInput.path) {
-      hint = `writing file: ${String(toolInput.path)}`;
-    } else if (toolName === "edit" && toolInput.path) {
-      hint = `editing file: ${String(toolInput.path)}`;
-    } else if (toolName === "bash" && toolInput.command) {
-      const cmd = String(toolInput.command).slice(0, 40);
-      hint = `running command: ${cmd}`;
-    }
-  }
-
-  lastVibeTime = now;
-  void generateAndUpdate(hint, setWorkingMessage);
 }
 
 export function onVibeAgentEnd(setWorkingMessage: (msg?: string) => void): void {
   isStreaming = false;
-  stopFileModeTicker();
   currentGeneration?.abort();
   setWorkingMessage(undefined);
 }
