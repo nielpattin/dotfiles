@@ -32,9 +32,7 @@
       ]
     },
     "git:github.com/nicobailon/pi-interactive-shell",
-    "git:github.com/nicobailon/pi-subagents",
-    "npm:@marckrenn/pi-sub-core",
-    "npm:@marckrenn/pi-sub-bar"
+    "git:github.com/nicobailon/pi-subagents"
   ],
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
@@ -51,6 +49,7 @@
   ],
   "extensions": [
     "+extensions\\tools.ts",
+    "+extensions\\prompt-stash.ts",
     "+extensions\\cheap-commits\\index.ts",
     "+extensions\\smart-sessions\\index.ts",
     "+extensions\\handoff\\index.ts",
