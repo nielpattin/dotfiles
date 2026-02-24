@@ -16,22 +16,27 @@
         "-arcade\\ping.ts",
         "-arcade\\spice-invaders.ts",
         "-arcade\\mario-not\\mario-not.ts",
-        "+arcade\\tetris.ts",
         "-agent-guidance\\agent-guidance.ts",
         "-code-actions\\index.ts",
         "-files-widget\\index.ts",
         "-ralph-wiggum\\index.ts",
         "-raw-paste\\index.ts",
         "+usage-extension\\index.ts",
-        "+tab-status\\tab-status.ts"
+        "+tab-status\\tab-status.ts",
+        "+arcade\\tetris.ts"
       ],
       "skills": [
         "-extending-pi\\skill-creator\\SKILL.md",
-        "+extending-pi\\SKILL.md",
-        "+ralph-wiggum\\SKILL.md"
+        "-ralph-wiggum\\SKILL.md",
+        "-extending-pi\\SKILL.md"
       ]
     },
-    "git:github.com/nicobailon/pi-interactive-shell",
+    {
+      "source": "git:github.com/nicobailon/pi-interactive-shell",
+      "extensions": [
+        "-index.ts"
+      ]
+    },
     "git:github.com/nicobailon/pi-subagents",
     "npm:@marckrenn/pi-sub-core",
     "npm:@marckrenn/pi-sub-bar"
@@ -59,7 +64,8 @@
     "+extensions\\permissions\\index.ts",
     "+extensions\\session-query\\index.ts",
     "-extensions\\modes\\index.ts",
-    "-extensions\\image-paste-ui.ts"
+    "-extensions\\image-paste-ui.ts",
+    "-extensions\\working-vibes\\index.ts"
   ],
   "workingVibeModel": "openai-codex/gpt-5.3-codex",
   "workingVibe": "game-dev",
@@ -75,5 +81,19 @@
   "workingVibeRefreshInterval": 5,
   "terminal": {
     "clearOnShrink": false
-  }
+  },
+  "nodeRestore": {
+    "silentCheckpoints": false
+  },
+  "themes": [
+    "-themes\\dracula.json",
+    "-themes\\everforest.json",
+    "-themes\\gruvbox.json",
+    "-themes\\midnight-ocean.json",
+    "-themes\\nord.json",
+    "-themes\\ocean-breeze.json",
+    "-themes\\rose-pine.json",
+    "-themes\\synthwave.json",
+    "+themes\\tokyo-night.json"
+  ]
 }
