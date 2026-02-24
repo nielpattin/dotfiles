@@ -1,8 +1,8 @@
 {
   "version": 3,
   "tools": {
-    "usageTool": false,
-    "allUsageTool": false
+    "usageTool": true,
+    "allUsageTool": true
   },
   "providers": {
     "anthropic": {

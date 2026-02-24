@@ -5,11 +5,10 @@
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
   "defaultThinkingLevel": "high",
-  "theme": "dark",
+  "theme": "catppuccin-mocha",
   "transport": "sse",
   "packages": [
     "https://github.com/Whamp/pi-read-map",
-    "git:github.com/marckrenn/pi-sub",
     {
       "source": "git:github.com/tmustier/pi-extensions",
       "extensions": [
@@ -33,7 +32,9 @@
       ]
     },
     "git:github.com/nicobailon/pi-interactive-shell",
-    "git:github.com/nicobailon/pi-subagents"
+    "git:github.com/nicobailon/pi-subagents",
+    "npm:@marckrenn/pi-sub-core",
+    "npm:@marckrenn/pi-sub-bar"
   ],
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
@@ -49,8 +50,6 @@
     "-..\\..\\.agents\\skills\\commit-message-generator\\SKILL.md"
   ],
   "extensions": [
-    "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-core\\index.ts",
-    "git\\github.com\\marckrenn\\pi-sub\\packages\\sub-bar\\index.ts",
     "+extensions\\tools.ts",
     "+extensions\\cheap-commits\\index.ts",
     "+extensions\\smart-sessions\\index.ts",

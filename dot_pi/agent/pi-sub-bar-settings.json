@@ -9,10 +9,10 @@
     "containBar": false,
     "brailleFillEmpty": false,
     "brailleFullBlocks": false,
-    "colorScheme": "base-warning-error",
+    "colorScheme": "success-base-warning-error",
     "usageColorTargets": {
-      "title": true,
-      "timer": true,
+      "title": false,
+      "timer": false,
       "bar": true,
       "usageLabel": true,
       "status": true
@@ -29,13 +29,13 @@
     "providerLabel": "none",
     "providerLabelColon": false,
     "providerLabelBold": true,
-    "baseTextColor": "border",
-    "backgroundColor": "text",
+    "baseTextColor": "text",
+    "backgroundColor": "borderMuted",
     "showWindowTitle": true,
     "boldWindowTitle": true,
     "showUsageLabels": true,
     "dividerCharacter": "│",
-    "dividerColor": "primary",
+    "dividerColor": "borderMuted",
     "dividerBlanks": 1,
     "showProviderDivider": true,
     "dividerFooterJoin": false,
@@ -46,9 +46,9 @@
     "widgetPlacement": "belowEditor",
     "showContextBar": false,
     "errorThreshold": 15,
-    "warningThreshold": 50,
+    "warningThreshold": 60,
     "overflow": "truncate",
-    "successThreshold": 75
+    "successThreshold": 85
   },
   "providers": {
     "anthropic": {
