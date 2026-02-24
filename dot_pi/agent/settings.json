@@ -73,6 +73,6 @@
   "workingVibeMode": "file",
   "workingVibeRefreshInterval": 5,
   "terminal": {
-    "clearOnShrink": true
+    "clearOnShrink": false
   }
 }

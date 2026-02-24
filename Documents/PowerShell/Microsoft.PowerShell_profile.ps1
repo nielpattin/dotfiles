@@ -274,7 +274,7 @@ Set-Alias -Name oc -Value opencode.cmd
 function gbash { & "C:\Program Files\Git\bin\bash.exe" @Args }
 
 # po = local pi build (repo dist)
-function po {
+function p {
     & node "$HOME/repo/public/pi-mono/packages/coding-agent/dist/cli.js" @args
 }
 
