@@ -71,5 +71,8 @@
   "showHardwareCursor": false,
   "doubleEscapeAction": "tree",
   "workingVibeMode": "file",
-  "workingVibeRefreshInterval": 5
+  "workingVibeRefreshInterval": 5,
+  "terminal": {
+    "clearOnShrink": true
+  }
 }

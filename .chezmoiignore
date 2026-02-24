@@ -13,8 +13,6 @@
 **/.cache/**
 **/.idea/**
 **/.vscode/**
-# Repo docs only (do not deploy to home)
-README.md
 
 # jsonl logs
 **/*.jsonl
