@@ -26,3 +26,5 @@ This directory is the **source of truth** for your Pi config:
 ## Validation Checklist (after edits)
 
 - JSON is valid and minimally formatted.
+- For TypeScript changes under `~/.pi/agent/`, run typecheck with the project config (not ad-hoc flags):
+  - `cd "$HOME/.pi/agent" && pnpm exec tsc -p tsconfig.json --noEmit`
