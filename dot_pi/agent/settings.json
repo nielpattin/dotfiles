@@ -63,6 +63,7 @@
     "+extensions\\handoff\\index.ts",
     "+extensions\\permissions\\index.ts",
     "+extensions\\session-query\\index.ts",
+    "+extensions\\agents-discovery\\index.ts",
     "-extensions\\modes\\index.ts",
     "-extensions\\image-paste-ui.ts",
     "-extensions\\working-vibes\\index.ts"
