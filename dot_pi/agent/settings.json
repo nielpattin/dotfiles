@@ -1,5 +1,5 @@
 {
-  "lastChangelogVersion": "0.54.2",
+  "lastChangelogVersion": "0.55.0",
   "hideThinkingBlock": false,
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
@@ -80,7 +80,7 @@
   "workingVibeMode": "file",
   "workingVibeRefreshInterval": 5,
   "terminal": {
-    "clearOnShrink": false
+    "clearOnShrink": true
   },
   "nodeRestore": {
     "silentCheckpoints": false

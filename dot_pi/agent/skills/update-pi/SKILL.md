@@ -1,6 +1,6 @@
 ---
 name: update-pi
-description: AI-guided Pi update workflow with step-by-step command execution and verification gates after each step (global pnpm package + pi-mono upstream sync + merge to fix-windows-paste-image + dist rebuild).
+description: AI-guided Pi update workflow with step-by-step command execution and verification gates after each step (global pnpm package + pi-mono upstream sync + extension API impact scan + merge to fix-windows-paste-image + dist rebuild).
 ---
 
 # Update Pi (AI-Verified, Step-by-Step)
@@ -16,6 +16,7 @@ Run one command group at a time, inspect output, verify invariants, then continu
 - Repo: `/c/Users/niel/repo/public/pi-mono`
 - Branch flow: `main` <- `upstream/main`, then merge `main` -> `fix-windows-paste-image`
 - Build target: `packages/coding-agent/dist/cli.js`
+- Local extensions dir for compatibility scan/update: `/c/Users/niel/.pi/agent/extensions`
 
 ## Step-by-step workflow
 
@@ -61,7 +62,7 @@ Verify:
 - PowerShell profile still points `p` to `pi-mono/packages/coding-agent/dist/cli.js`
 
 Decide:
-- if global drift exists, plan update in step 6
+- if global drift exists, plan update in step 8
 
 ---
 
@@ -81,6 +82,7 @@ git rev-list --count upstream/main..main
 Verify:
 - `upstream/main` exists
 - behind/ahead counts are known
+- record `main` SHA from this step as `<MAIN_BEFORE_SHA>` for compatibility diff range
 
 ---
 
@@ -107,9 +109,67 @@ If not, stop.
 
 ---
 
-### 4) Optional push main to origin/main
+### 4) Extension API change audit + impact scan (checkpoint)
 
-Run only if user wants push:
+Goal:
+- detect extension API/docs changes between `<MAIN_BEFORE_SHA>` and `upstream/main`
+- scan local extensions for potential impact
+- produce summary before any extension edits
+
+Run:
+
+```bash
+git diff --name-only <MAIN_BEFORE_SHA>..upstream/main -- packages/coding-agent/src/core/extensions packages/coding-agent/src/core/package-manager.ts packages/coding-agent/src/core/resource-loader.ts packages/coding-agent/docs/extensions.md packages/coding-agent/examples/extensions
+git log --oneline <MAIN_BEFORE_SHA>..upstream/main -- packages/coding-agent/src/core/extensions packages/coding-agent/src/core/package-manager.ts packages/coding-agent/src/core/resource-loader.ts packages/coding-agent/docs/extensions.md packages/coding-agent/examples/extensions
+if [ -d /c/Users/niel/.pi/agent/extensions ]; then echo extensionsDirFound; else echo extensionsDirMissing; fi
+if [ -d /c/Users/niel/.pi/agent/extensions ]; then find /c/Users/niel/.pi/agent/extensions -mindepth 1 -maxdepth 1 -type d; fi
+if [ -d /c/Users/niel/.pi/agent/extensions ]; then rg -n "register|slash|shortcut|keybinding|overlay|tool|permission|resource|command" /c/Users/niel/.pi/agent/extensions; fi
+```
+
+Verify:
+- extension-related diff range was checked
+- local extension directories were enumerated
+- candidate usages in local extensions were scanned
+
+Decision:
+- if no extension API/docs changes are detected: PASS and continue automatically
+- if extension API/docs changes are detected but no local extension is likely impacted: include in report and continue automatically
+- if one or more local extensions are likely impacted:
+  - provide a checkpoint summary with:
+    - new commits / changed files
+    - what changed in extension API/docs
+    - which extension folders may be affected and why
+    - proposed edits per extension
+  - **ask user for confirmation before step 5**
+
+---
+
+### 5) Update affected local extensions (only after user confirmation)
+
+Run for each affected extension folder:
+
+```bash
+cd <EXTENSION_DIR>
+git rev-parse --is-inside-work-tree
+git status --porcelain
+```
+
+Then:
+- if folder is a git repo and clean, create a backup branch before edits
+- apply minimal compatibility edits for the detected API changes
+- validate each updated extension with its available project command(s) (`build`, `test`, or equivalent)
+
+Verify:
+- each affected extension has a clear change summary
+- validation command(s) completed successfully (or explicitly reported if unavailable)
+
+If any extension update fails, stop and report.
+
+---
+
+### 6) Push main to origin/main (always)
+
+Run:
 
 ```bash
 git push origin main
@@ -120,7 +180,7 @@ Verify:
 
 ---
 
-### 5) Merge main into fix-windows-paste-image with checkpoint
+### 7) Merge main into fix-windows-paste-image with checkpoint
 
 Run:
 
@@ -141,7 +201,7 @@ If conflict occurs:
 
 ---
 
-### 6) Update global pnpm package only if drift exists
+### 8) Update global pnpm package only if drift exists
 
 Run only when needed from step 1:
 
@@ -160,7 +220,7 @@ Pass condition:
 
 ---
 
-### 7) Rebuild dist used by `p` (npm workspace, not pnpm)
+### 9) Rebuild dist used by `p` (npm workspace, not pnpm)
 
 Run:
 
@@ -181,19 +241,24 @@ Pass condition:
 
 ---
 
-### 8) Final report
+### 10) Final report
 Provide a concise summary with:
 - latest npm version
 - global version before/after
 - `.pi` config check result (settings/package/deps + `p` alias target)
 - main before/after + upstream/main SHA
-- whether origin/main push happened
+- extension API scan result (changed commits/files + impact status)
+- affected local extensions and update result (if any)
+- origin/main push result
 - merge result on `fix-windows-paste-image`
 - dist build status
 
 ## Behavior rules for agent
 
 - After each step: print `Step N: PASS/FAIL` and why.
+- Continue automatically to the next step on PASS; do not pause for confirmation between steps.
+- **Only** pause for confirmation when step 4 finds likely impacted local extensions before performing step 5 updates.
+- Step 6 push to `origin/main` is mandatory in this workflow; do not ask whether to push.
 - On fail: stop, do not continue automatically.
 - Never modify dotfiles clones or unrelated folders for this workflow.
 - Never mask command failures with follow-up commands in the same shell block (e.g. `cmd && echo OK`).
