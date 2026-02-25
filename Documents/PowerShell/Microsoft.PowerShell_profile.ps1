@@ -107,6 +107,10 @@ Measure-ProfileSection "mise" {
 # ==============================================================================
 function touch($file) { "" | Out-File $file -Encoding ASCII }
 
+if (Test-Path Alias:ls) { Remove-Item Alias:ls -Force -ErrorAction SilentlyContinue }
+function ls { eza -la --icons --git @args }
+# Set-Alias -Name lsa -Value ls -Option AllScope
+
 function ff($name) {
     Get-ChildItem -recurse -filter "*${name}*" -ErrorAction SilentlyContinue | ForEach-Object {
         Write-Output "$($_.FullName)"
