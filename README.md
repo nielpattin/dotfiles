@@ -1,27 +1,32 @@
 # Dotfiles Runbook (chezmoi + age)
 
-This is the full, end-to-end workflow for this dotfiles repo.
+End-to-end workflow for this repo.
 
-It covers:
+Covers:
 - first setup on a new machine
 - daily sync/update flow
-- adding/editing managed files
-- encrypted secrets (cross-shell)
+- adding new config files
+- importing existing live files when needed
+- encrypted secrets
 - commit/push flow
-- common error prompts and fixes
+- common fixes
 
 ---
 
 ## 0) Core model (important)
 
-- **Source of truth**: chezmoi source repo  
-  `~/.local/share/chezmoi`
+- **Source of truth**: `~/.local/share/chezmoi`
 - **Live files**: your home directory (`~`)
-- You usually:
-  1. edit files in `~` (or use `chezmoi edit`)
-  2. sync back to source (`chezmoi re-add` / `chezmoi add`)
-  3. commit/push source repo
-  4. run `chezmoi apply`
+
+### Default workflow (this repo)
+1. Make changes directly in source (`~/.local/share/chezmoi`)
+2. Review with `chezmoi diff`
+3. Sync to home with `chezmoi apply`
+4. Commit/push source repo changes
+
+### When to use `add` / `re-add`
+- Use `chezmoi add <target>` only if a file already exists in `~` and you want to import it into source.
+- Use `chezmoi re-add <target>` only if a managed target in `~` was manually changed and must be reconciled back to source.
 
 ---
 
@@ -31,37 +36,37 @@ Install:
 - `git`
 - `chezmoi`
 
-You also need your **age private key** file available at:
+Age private key file must exist at:
 
 `~/.config/chezmoi/key.txt`
 
-> This key must never be committed.
+> Never commit this key.
 
 ---
 
 ## 2) First-time setup on a new machine
 
-## 2.1 Clone/init dotfiles with chezmoi
+### 2.1 Init from repo
 
 ```bash
 chezmoi init git@github.com:nielpattin/dotfiles.git
 ```
 
-## 2.2 Put age key in place
+### 2.2 Place age key
 
 Create:
 
 `~/.config/chezmoi/key.txt`
 
-Paste your private age identity there.
+Paste your private age identity.
 
-## 2.3 Apply managed files
+### 2.3 Apply managed files
 
 ```bash
-chezmoi apply # sync source → your home directory.
+chezmoi apply
 ```
 
-## 2.4 Verify clean state
+### 2.4 Verify clean state
 
 ```bash
 chezmoi status
@@ -72,11 +77,12 @@ No output = clean.
 
 ---
 
-## 3) Daily update flow (pull latest dotfiles)
+## 3) Daily update flow
 
 ```bash
 cd ~/.local/share/chezmoi
 git pull --ff-only
+chezmoi diff
 chezmoi apply
 chezmoi status
 ```
@@ -85,51 +91,61 @@ chezmoi status
 
 ## 4) Add or update normal dotfiles
 
-### 4.1 Add a new file to management
+### 4.1 New file/config (preferred)
+
+Create it directly in source with chezmoi naming:
+- `~/.config/foo/bar.toml` → `dot_config/foo/bar.toml`
+- `~/.pi/agent/settings.json` → `dot_pi/agent/settings.json`
+
+Then:
 
 ```bash
-chezmoi add ~/.somefile
+cd ~/.local/share/chezmoi
+chezmoi diff
+chezmoi apply
+```
+
+### 4.2 Import an existing live file (only when needed)
+
+If file already exists in `~` and is not in source yet:
+
+```bash
+chezmoi add ~/.config/foo/bar.toml
+chezmoi diff
+chezmoi apply
 ```
 
 Useful flags:
 - `--template` for templated files
 - `--encrypt` for sensitive files
 
-### 4.2 You edited a managed target directly (very common) (cuz you idiot)
+### 4.3 Managed target changed manually in `~`
 
-Example: you changed `~/.config/mise/config.toml`.
+If `chezmoi apply` reports target changed since last write:
 
-When `chezmoi apply` says file changed since last write:
-- choose `skip`
-- then sync back:
+1. choose `skip`
+2. reconcile back to source:
 
 ```bash
-chezmoi re-add ~/.config/mise/config.toml
+chezmoi re-add <target-path>
 chezmoi apply
 ```
 
 ---
 
-## 5) Secrets workflow (cross-shell, automatic)
+## 5) Secrets workflow
 
-## 5.1 Canonical secret file
-
-Managed target (edit this):
-
-`~/.config/chezmoi/secrets.yaml`
+### 5.1 Canonical source file
 
 Encrypted source in repo:
 
 `dot_config/private_chezmoi/encrypted_secrets.yaml.age`
 
-## 5.2 Edit secrets (recommended path)
+### 5.2 Add/update secrets
 
-```bash
-chezmoi edit ~/.config/chezmoi/secrets.yaml
-chezmoi apply
-```
+Update encrypted secrets in source, then apply.
 
-Use this shape:
+Expected structure:
 
 ```yaml
 api:
@@ -138,22 +154,22 @@ api:
   ANY_NEW_KEY: "..."
 ```
 
-### Important
-All keys under `api:` are now exported automatically (no template edits needed per new key).
+All keys under `api:` are exported automatically by templates.
 
-## 5.3 Generated shell files
+### 5.3 Generated shell files
 
-From `api:` keys, chezmoi generates:
-
+From `api:` keys, chezmoi renders:
 - PowerShell: `~/Documents/PowerShell/secrets.ps1`
 - Bash: `~/.bash_secrets`
 - Fish: `~/.config/fish/conf.d/10-secrets.fish`
+
+Do not edit generated outputs directly.
 
 ---
 
 ## 6) Verify secrets are loaded
 
-## 6.1 PowerShell
+### 6.1 PowerShell
 
 ```pwsh
 if ($env:BRAVE_API_KEY) { "loaded len=$($env:BRAVE_API_KEY.Length)" } else { "NOT loaded" }
@@ -165,13 +181,13 @@ Reload profile if needed:
 . $PROFILE
 ```
 
-## 6.2 Bash (inheritance check from same pwsh session)
+### 6.2 Bash (from same pwsh session)
 
 ```pwsh
 bash -lc 'if [ -n "$BRAVE_API_KEY" ]; then echo "loaded len=${#BRAVE_API_KEY}"; else echo "NOT loaded"; fi'
 ```
 
-## 6.3 Fish
+### 6.3 Fish
 
 ```fish
 if test -n "$BRAVE_API_KEY"; echo "loaded"; else; echo "NOT loaded"; end
@@ -179,49 +195,29 @@ if test -n "$BRAVE_API_KEY"; echo "loaded"; else; echo "NOT loaded"; end
 
 ---
 
-## 7) Bash/Fish loading behavior
-
-- Fish auto-loads `~/.config/fish/conf.d/*.fish` (already handled).
-- Bash may need this in `~/.bashrc`:
-
-```bash
-[ -f "$HOME/.bash_secrets" ] && . "$HOME/.bash_secrets"
-```
-
-PowerShell profile already loads `~/Documents/PowerShell/secrets.ps1`.
-
----
-
-## 8) Commit + push workflow
+## 7) Commit + push workflow
 
 ```bash
 cd ~/.local/share/chezmoi
 git status --short
+chezmoi status
+chezmoi diff
 
-# stage what changed
 git add <files>
-
 git commit -m "chore(dotfiles): update ..."
 git push
 ```
 
-Quick sanity checks before push:
-
-```bash
-git status --short
-chezmoi status
-chezmoi diff
-```
-
 ---
 
-## 9) Common errors and exact fixes
+## 8) Common errors and fixes
 
-## 9.1 "has changed since chezmoi last wrote it"
+### 8.1 "has changed since chezmoi last wrote it"
 
-You changed target manually. Fix:
+You changed a managed target in `~` manually.
 
-1. choose `skip` in prompt
+Fix:
+1. choose `skip`
 2. run:
 
 ```bash
@@ -229,65 +225,54 @@ chezmoi re-add <target-path>
 chezmoi apply
 ```
 
-## 9.2 Secret scanner warnings during `re-add`
+### 8.2 Secret scanner warning during `re-add`
 
-You may see warnings like "Detected Generic API Key".
-
-- Best fix: use `chezmoi edit ~/.config/chezmoi/secrets.yaml` instead of manual edit + re-add.
-- If you must re-add anyway:
+Prefer source-first encrypted updates. If you must re-add secrets anyway:
 
 ```bash
 chezmoi re-add ~/.config/chezmoi/secrets.yaml --secrets ignore
 chezmoi apply
 ```
 
-## 9.3 Warning: "config file template has changed, run chezmoi init"
-
-Run:
+### 8.3 "config file template has changed, run chezmoi init"
 
 ```bash
 chezmoi init --source ~/.local/share/chezmoi
-```
-
-Then check:
-
-```bash
 chezmoi status
 chezmoi diff
 ```
 
 ---
 
-## 10) Security rules
+## 9) Security rules
 
 - Never commit plaintext secrets.
-- Keep `~/.config/chezmoi/key.txt` out of git.
-- Back up age key securely (password manager/offline backup).
-- If key is lost, encrypted files in repo cannot be decrypted.
+- Never commit `~/.config/chezmoi/key.txt`.
+- Back up age key securely.
+- If key is lost, encrypted repo files cannot be decrypted.
 
 ---
 
-## 11) Useful commands cheat sheet
+## 10) Command cheat sheet
 
 ```bash
-# current state
+# source repo
+cd ~/.local/share/chezmoi
+
+# inspect + apply
 chezmoi status
 chezmoi diff
-
-# apply changes
 chezmoi apply
 
-# edit managed file safely
-chezmoi edit ~/.config/chezmoi/secrets.yaml
+# import existing live file to source
+chezmoi add ~/.config/<path>
 
-# sync manual edits back to source
-chezmoi re-add ~/.config/mise/config.toml
-# or just re-add all changes
-chezmoi re-add
+# reconcile manual target change back to source
+chezmoi re-add ~/.config/<path>
 
-# see source repo status
-cd ~/.local/share/chezmoi && git status --short
-
-# decrypt preview (debug)
-chezmoi decrypt ~/.local/share/chezmoi/dot_config/private_chezmoi/encrypted_secrets.yaml.age
+# git
+git status --short
+git add <files>
+git commit -m "chore(dotfiles): ..."
+git push
 ```
