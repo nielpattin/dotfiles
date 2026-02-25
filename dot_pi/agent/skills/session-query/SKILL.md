@@ -1,32 +1,47 @@
 ---
 name: session-query
-description: Query previous pi sessions to retrieve context, decisions, code changes, or other information. Use when you need to look up what happened in a parent session or any other session file.
+description: Search and query previous pi sessions for context, decisions, code changes, or other information. Use when you need to look up what happened in a parent session or any other session file.
 disable-model-invocation: true
 ---
 
 # Session Query
 
-Query pi session files to retrieve context from past conversations.
+Use Pi session history tools in two steps:
 
-This skill is automatically invoked in handed-off sessions when you need to look up details from the parent session.
+1. `session_search` to discover relevant sessions/branches.
+2. `session_query` to ask detailed questions about one result.
 
-## Usage
+## Tools
 
-Use the `session_query` tool:
+### `session_search(...)`
 
-```
-session_query(sessionPath, question)
-```
+Search across `~/.pi/agent/sessions`.
 
-- `sessionPath`: Full path to the session file (provided in the "Parent session:" line). Use an absolute path such as `C:\Users\...\session.jsonl` or `/home/.../session.jsonl`.
-- `question`: Specific question about that session (e.g., "What files were modified?" or "What approach was chosen?")
+Common params:
+- `keyword`
+- `file`
+- `after` / `before` (`YYYY-MM-DD`, `7d`, `2w`)
+- `workspace`
+- `all_workspaces`
+- `limit`
+
+### `session_query(...)`
+
+Ask a specific question about one session.
+
+Supported params:
+- `question` (required)
+- `sessionPath` (legacy / direct path)
+- `sessionId` (from `session_search`)
+- `branchLeafId` (optional, from `session_search`)
+- `maxMessages` (optional)
 
 ## Examples
 
-```
-session_query("C:\\Users\\niel\\.pi\\agent\\sessions\\...\\session.jsonl", "What files were modified?")
-session_query("/path/to/session.jsonl", "What approach was chosen for authentication?")
-session_query("/path/to/session.jsonl", "Summarize the key decisions made")
+```text
+session_search({ keyword: "permissions extension", workspace: "chezmoi" })
+session_query({ sessionId: "<session-id>", branchLeafId: "<leaf-id>", question: "What approach did we choose?" })
+session_query({ sessionPath: "$HOME/.pi/agent/sessions/.../session.jsonl", question: "What files were modified?" })
 ```
 
-The tool loads the session and uses an LLM to answer your question based on its contents. Ask specific questions for best results.
+If a session was handed off with a `Parent session:` line, use that path directly with `session_query`.
