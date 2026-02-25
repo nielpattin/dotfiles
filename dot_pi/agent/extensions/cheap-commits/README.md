@@ -1,353 +1,166 @@
-# Generate Commit Message Extension
+# cheap-commits extension
 
-Automated semantic commit generation using AI models with intelligent model selection and configuration.
+AI-assisted commit generation for Pi, with cost-aware model selection and an interactive model picker.
 
-## Features
+## What this extension actually registers
 
-- **Two-command design:** Separate configuration from commit generation
-- **Cost-aware model selection:** Automatically chooses the cheapest model, with optional configuration
-- **Interactive model picker:** Full-width overlay with dynamic sorting by name, provider, or cost
-- **Persistent configuration:** Saves selected model to `~/.pi/agent/generate-commit-message.json`
-- **Theme-aware UI:** Respects user's pi theme settings
-- **Fallback agents:** Creates a fallback agent if none are found in the project
+This extension registers **one command**:
 
-## Commands
+- `/cheap-commit`
 
-### `/commit [optional prompt]`
+It does **not** register separate `/commit` or `/commit-model` commands.
 
-Generate and stage a semantic commit using the configured model.
+---
 
-```bash
-/commit                                    # Uses default prompt from skill
-/commit "fix: update dependencies"         # Uses custom prompt
-```
+## Command usage
 
-**How it works:**
-1. Checks for configured model in `~/.pi/agent/generate-commit-message.json`
-2. Falls back to auto-selecting the cheapest available model
-3. Delegates to a subagent with the `writing-git-commits` skill
-4. Shows feedback about which model was used and its pricing
+### `/cheap-commit`
 
-### `/commit-model [optional model]`
-
-Configure which model to use for future commits. Can be called with or without arguments.
+Default behavior: generate commits using the configured model (or auto-selected cheapest model).
 
 ```bash
-/commit-model                              # Opens interactive picker to select model
-/commit-model anthropic/claude-opus        # Directly configure without UI
+/cheap-commit
 ```
 
-**Model picker controls:**
-- `↑` / `↓` or `j` / `k` - Navigate models (automatically skips provider headers)
-- `n` - Sort by name (toggle A→Z / Z→A)
-- `p` - Sort by provider (toggle A→Z / Z→A) — default
-- `c` - Sort by cost (toggle cheapest first / most expensive first)
-- `Enter` or `Space` - Select and save configuration
-- `Esc` or `Ctrl+C` - Cancel without saving
-- Type any character - Filter models by fuzzy matching
-- `Backspace` - Clear filter
+Equivalent to:
 
-**Model picker layout:**
-Models are grouped by provider with separator headers:
+```bash
+/cheap-commit generate
 ```
-── anthropic ──────────────────────────────────────────────────────────────────
-   claude-sonnet-4                                    $3/$15 per 1M tokens
- ▶ claude-sonnet-4-20250514                           $3/$15 per 1M tokens
-── openai ─────────────────────────────────────────────────────────────────────
-   gpt-4o                                             $5/$15 per 1M tokens
-   gpt-4o-mini                                        $0.15/$0.6 per 1M tokens
+
+### `/cheap-commit generate [prompt...]`
+
+Generate and stage commits with an optional custom task prompt.
+
+```bash
+/cheap-commit generate
+/cheap-commit generate "Commit all current changes with conventional commit messages"
 ```
+
+### `/cheap-commit model [provider/model]`
+
+Configure the model used by `/cheap-commit generate`.
+
+```bash
+/cheap-commit model
+/cheap-commit model openai/gpt-4o-mini
+```
+
+- With no argument, opens the interactive picker.
+- With a single token argument, stores that model string directly.
+- With multi-word input, opens the picker.
+
+### `/cheap-commit help`
+
+Currently a placeholder in code (no dedicated help output yet).
+
+---
+
+## Model picker controls
+
+- `↑` / `↓` or `j` / `k`: navigate
+- `n`: sort by model name (toggle asc/desc)
+- `p`: sort by provider (toggle asc/desc)
+- `c`: sort by cost (toggle asc/desc)
+- `Enter` or `Space`: select
+- `Esc` or `Ctrl+C`: cancel
+- Type `[a-zA-Z0-9-_/.]`: fuzzy filter
+- `Backspace`: delete one filter character
+
+UI behavior from code:
+
+- Overlay width: `100%`
+- Max height: `35%` of terminal
+- Anchor: `bottom-center`
+- Models grouped by provider with separator rows
+
+---
 
 ## Configuration
 
-Configuration uses `@zenobius/pi-extension-config` for layered config management.
+Config is managed by `@zenobius/pi-extension-config` with config name:
 
-**Config locations (highest priority first):**
-1. **Environment variables** — `GENERATE_COMMIT_MESSAGE_MODE`, `GENERATE_COMMIT_MESSAGE_MAX_OUTPUT_COST`
-2. **Project config** — `.pi/generate-commit-message.config.json` (in git root or cwd)
-3. **Home config** — `~/.pi/agent/generate-commit-message.config.json`
-4. **Defaults** — Built-in defaults
+- `generate-commit-message`
 
-```json
-{
-  "mode": "anthropic/claude-opus"
-}
-```
+### Config priority
 
-### Config Fields
+1. Environment variables (prefix from config name)
+2. Project config: `.pi/generate-commit-message.config.json`
+3. Home config: `~/.pi/agent/generate-commit-message.config.json`
+4. Built-in defaults
 
-- `mode` (string) - Model to use in `provider/model-id` format
-- `prompt` (string) - Default prompt to use when running `/commit` with no arguments
-- `maxOutputCost` (number) - Maximum output cost per million tokens for "cheap" model filtering (default: 1.0)
+### Supported fields
 
-### Example Configurations
-
-**Cheapest model only:**
-```json
-{
-  "mode": "google/gemini-2.0-flash"
-}
-```
-
-**High-quality model:**
-```json
-{
-  "mode": "anthropic/claude-opus",
-  "prompt": "Write semantic commits following the writing-git-commits skill"
-}
-```
-
-**Custom cost threshold:**
 ```json
 {
   "mode": "openai/gpt-4o-mini",
-  "maxOutputCost": 0.5
+  "prompt": "Use the writing-git-commits skill to commit changes safely",
+  "maxOutputCost": 1.0
 }
 ```
 
-## Model Selection Strategy
+- `mode` (`string`): model in `provider/model` format
+- `prompt` (`string`): default prompt when no prompt arg is passed
+- `maxOutputCost` (`number`): threshold used by cheap auto-selection (default `1.0`)
 
-### For `/commit` command:
+---
 
-1. **Explicit model** (if provided as argument to extension)
-2. **Configured model** (from config file `mode` field)
-3. **Auto-selected cheapest model** (fallback, respecting `maxOutputCost` threshold)
+## Model selection logic (`generate`)
 
-### Cost Calculation:
+When running commit generation:
 
-- **Cost Score** = `input_cost + (output_cost × 2)`
-  - Weights output cost 2× heavier since commit messages have short input but longer output
-- **Request-based models** (e.g., GitHub Copilot with $0/$0 pricing) are deprioritized
-- **Token-based models** with clear per-token pricing are preferred
-- **Fallback heuristic:** If no token-based models under threshold, uses name-based detection (mini, flash, haiku, lite, nano, micro, free)
+1. If `mode` exists in config, use it.
+2. Otherwise auto-pick cheapest model.
 
-## User Workflows
+Auto-pick flow:
 
-### First-Time Use
+1. Prefer token-priced models (exclude `$0/$0` request-priced models)
+2. Keep models where `output <= maxOutputCost`
+3. Rank by score: `input + (output * 2)`
+4. If none match threshold, try cheap-name heuristic:
+   - `mini|flash|nano|haiku|lite|micro|free`
+5. If still none, pick cheapest token-priced model overall
+6. If no token-priced models exist, fall back to request-priced models
+7. If registry is empty, hard fallback:
+   - `github-copilot/gpt-4o-mini`
 
-```bash
-# Generate commit with auto-selected cheapest model
-/commit "fix: typo in README"
+---
 
-# Check current config
-cat ~/.pi/agent/generate-commit-message.json
+## Agent selection logic
+
+Commit work is delegated to a subagent with skill `writing-git-commits`.
+
+Agent selection order:
+
+1. Nearest project `.pi/agents` (walking up from current cwd)
+2. User agents in `~/.pi/agent/agents`
+3. Preferred names: `general`, `worker`, `default`, `scout`
+4. Otherwise first discovered agent
+5. Otherwise create fallback agent:
+   - `~/.pi/agent/agents/commit-writer.md`
+
+The generated task includes a repository guard so the subagent stays in the current repo unless explicitly asked to switch.
+
+---
+
+## Files in this extension
+
+```text
+dot_pi/agent/extensions/cheap-commits/
+├── index.ts
+└── README.md
 ```
 
-### Configure Once, Use Forever
+---
 
-```bash
-# Step 1: Choose your preferred model interactively
-/commit-model
+## Notes
 
-# Navigate picker with arrow keys
-# Sort by cost with 'c' key
-# Press Enter on your choice
-
-# Step 2: Generate commits (all use configured model now)
-/commit
-/commit "docs: update changelog"
-/commit "refactor: extract function"
-```
-
-### Quick Configure by Model Name
-
-```bash
-# Set model without opening picker
-/commit-model anthropic/claude-opus
-
-# Verify
-cat ~/.pi/agent/generate-commit-message.json
-```
-
-### Switch Models Later
-
-```bash
-# Change configuration anytime
-/commit-model
-
-# Or directly specify new model
-/commit-model openai/gpt-4o-mini
-```
-
-## Integration Points
-
-### Model Registry
-
-The extension queries available models via `ctx.modelRegistry.getAvailable()`, which returns model info including:
-- `id` - Model identifier
-- `provider` - Provider name
-- `cost` - Input/output/cache pricing per 1M tokens
-
-### Agent Discovery
-
-Uses pi's agent discovery system to find available subagents:
-1. Looks in nearest `.pi/agents/` directory (walking up from cwd)
-2. Looks in user agents directory (`~/.pi/agent/agents/`)
-3. Prefers agents in order: `general`, `worker`, `default`, `scout`
-4. Creates fallback `commit-writer` agent if none found
-
-### Skill Integration
-
-Delegates to the `writing-git-commits` skill for actual commit generation. This skill handles:
-- Analyzing staged changes
-- Writing semantic commit messages
-- Following Conventional Commits specification
-- Staging the commit
-
-### Subagent Execution
-
-Dispatches work via `pi.sendUserMessage()` with:
-```typescript
-{
-  agent: "selected-agent-name",
-  task: "prompt for commit generation",
-  model: "provider/model-id",
-  skill: "writing-git-commits",
-  clarify: false,
-  agentScope: "both"
-}
-```
-
-## Architecture
-
-### Key Components
-
-**`calculateCostScore(model)`**
-- Converts model pricing to comparable score
-- Deprioritizes request-based pricing ($0/$0)
-- Returns Infinity for non-token-based models
-
-**`pickCheapestModel(ctx, maxOutputCost)`**
-- Filters models by cost threshold
-- Falls back to name-based heuristics
-- Returns model with lowest cost score
-
-**`selectModelInteractive(ctx)`**
-- Renders full-width overlay picker
-- Handles keyboard input (navigation, sorting, selection)
-- Returns selected model ID or null if cancelled
-
-**`getModelCost(ctx, modelString)`**
-- Looks up pricing for configured model
-- Parses `provider/model-id` format
-- Returns null if not found in registry
-
-**`formatCost(cost)`**
-- Formats pricing per 1M tokens
-- Preserves meaningful decimals for small prices
-- Handles $0 pricing gracefully
-
-### UI Elements
-
-**Model Picker Widget:**
-- Full-width overlay with box-drawing borders
-- Header with sort status indicator
-- Model list with left-aligned names, right-aligned prices
-- Interactive navigation and sorting
-- Theme-aware colors (accent, text, muted, dim)
-- Instructions footer
-
-## Performance
-
-- **Model list caching:** Fetched once per command invocation
-- **Cost calculations:** Only computed for displayed models
-- **UI rendering:** Full redraw on each keyboard input (acceptable for overlay)
-- **String operations:** Efficient padding and truncation
-
-## Troubleshooting
-
-### No models appear in picker
-
-**Cause:** Model registry is empty  
-**Solution:** Ensure at least one model is configured in pi's model registry
-
-### Configuration not saving
-
-**Cause:** File write permission issue  
-**Solution:** Check that `~/.pi/agent/` directory is writable
-```bash
-chmod 755 ~/.pi/agent
-touch ~/.pi/agent/test.json && rm ~/.pi/agent/test.json
-```
-
-### Model name not recognized
-
-**Cause:** Model format is `provider/model-id` but something else was provided  
-**Solution:** Use `/commit-model` without arguments to see available models and their exact names
-
-### Fallback agent not working
-
-**Cause:** No agents found in project or user directories  
-**Solution:** A fallback `commit-writer` agent is auto-created. Check:
-```bash
-cat ~/.pi/agent/agents/commit-writer.md
-```
-
-## File Structure
-
-```
-devtools/files/pi/agent/extensions/generate-commit-message/
-├── index.ts          # Main extension code
-├── package.json      # Dependencies (pi-extension-config)
-└── README.md         # This file
-```
-
-## Development
-
-### Building
-
-The extension is TypeScript. Ensure your build system compiles it:
-```bash
-# With tsc
-tsc devtools/files/pi/agent/extensions/generate-commit-message/index.ts
-
-# With esbuild or bundler configured in your pi setup
-```
-
-### Types
-
-Uses pi's extension API types:
-```typescript
-import type {
-  ExtensionAPI,
-  ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
-```
-
-### Testing
-
-To test the extension:
-1. Ensure it compiles without errors
-2. Run `/commit` and verify model is auto-selected
-3. Run `/commit-model` and verify interactive picker works
-4. Verify configuration is saved to `~/.pi/agent/generate-commit-message.json`
-5. Run `/commit` again and verify it uses the configured model
-
-## Design Principles
-
-1. **Separation of Concerns:** Configuration is separate from generation
-2. **Cost Transparency:** Users see what models cost before selection
-3. **Fallback Robustness:** Works even with missing agents or models
-4. **Theme Consistency:** UI respects user's pi theme settings
-5. **Keyboard-First:** Full keyboard navigation without mouse required
-6. **Minimal Dependencies:** Relies only on pi's model registry and agent discovery
-
-## Future Enhancements
-
-- Model history/recently used
-- Model filtering by capability (reasoning support, context window)
-- Pricing calculator for estimated commit costs
-- Custom cost thresholds per model category
-- Agent-specific model configuration
-- Commit preview before staging
-- Batch commit generation for multiple files
-
-## Related Skills
-
-- `writing-git-commits` - Semantic commit message writing
-- `superpowers:writing-git-commits` - Extended guide with examples and FAQ
-
-## See Also
-
-- `.memory/learning-fc61d42a-generate-commit-message-extension.md` - Distilled architecture and design patterns
-- `.memory/research-f1e37c82-commit-modal-fixes.md` - Modal UI fixes and analysis
+- The command sends a subagent-tool instruction via `pi.sendUserMessage(...)` with:
+  - `agent`
+  - `task`
+  - `model`
+  - `skill: "writing-git-commits"`
+  - `clarify: false`
+  - `agentScope: "both"`
+  - `cwd`
+- UI notifications show selected/configured model and formatted cost when available.
