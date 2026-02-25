@@ -3,8 +3,20 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 
 const skillPattern = /^\/skill:(\S+)\s*([\s\S]*)/;
 
-const SUMMARY_PROMPT =
-  "Summarize the user's request in 5-10 words max. Output ONLY the summary, nothing else. No quotes, no punctuation at the end.";
+const SUMMARY_PROMPT = `You are a session title generator.
+Output ONLY a single session title, nothing else.
+
+Rules:
+- Use the same language as the user input.
+- Keep it concise and natural.
+- Prefer 3-8 words (hard max 10 words).
+- Focus on the main intent/task.
+- Preserve important technical terms, filenames, error codes, numbers.
+- Never include tool names (read, bash, edit, etc).
+- Never include quotes.
+- No trailing punctuation.
+- If input is casual/short (e.g. "hi", "hello"), output a meaningful short title like "Greeting" or "Quick check-in".
+- Always output something meaningful.`;
 
 const PREFERRED_MODEL_BY_PROVIDER: Record<string, string> = {
   "openai-codex": "gpt-5.1-codex-mini",
@@ -108,14 +120,24 @@ export default function (pi: ExtensionAPI) {
           { apiKey: cheap.apiKey },
         );
 
-        const summary = response.content
+        const rawSummary = response.content
           .filter((c): c is { type: "text"; text: string } => c.type === "text")
           .map((c) => c.text)
           .join("")
           .trim();
 
+        const summary = rawSummary
+          .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+          .split("\n")
+          .map((line) => line.trim())
+          .find((line) => line.length > 0)
+          ?.replace(/[.!?]+$/g, "")
+          .replace(/^['"“”‘’]+|['"“”‘’]+$/g, "")
+          .trim();
+
         if (summary) {
-          pi.setSessionName(`${prefix}${summary}`.trim());
+          const title = summary.length > 100 ? `${summary.slice(0, 97).trimEnd()}...` : summary;
+          pi.setSessionName(`${prefix}${title}`.trim());
         }
       } catch {
         // Keep the truncated name, no big deal
