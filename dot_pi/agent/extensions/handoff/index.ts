@@ -25,8 +25,9 @@ const SYSTEM_PROMPT = `You are a context transfer assistant. Given a conversatio
 
 1. Summarizes relevant context from the conversation (decisions made, approaches taken, key findings)
 2. Lists any relevant files that were discussed or modified
-3. Clearly states the next task based on the user's goal
-4. Is self-contained - the new thread should be able to proceed without the old conversation
+3. Generates a 'Pending Tasks' checklist of work remaining from the current session
+4. Clearly states the next task based on the user's goal
+5. Is self-contained - the new thread should be able to proceed without the old conversation
 
 Format your response as a prompt the user can send to start the new thread. Be concise but include all necessary context. Do not include any preamble like "Here's the prompt" - just output the prompt itself.
 
@@ -39,6 +40,10 @@ We've been working on X. Key decisions:
 Files involved:
 - path/to/file1.ts
 - path/to/file2.ts
+
+## Pending Tasks
+- [ ] Implement Y
+- [ ] Fix Z discovered during research
 
 ## Task
 [Clear description of what to do next based on user's goal]`;
@@ -290,7 +295,7 @@ export default function (pi: ExtensionAPI) {
 			const error = await performHandoff(pi, ctx, params.goal, pendingHandoff, setPendingHandoff, true);
 			return {
 				content: [{ type: "text", text: error ?? "Handoff initiated. The session will switch after the current turn completes." }],
-				details: { ok: !error },
+				details: { ok: !error, goal: params.goal, error },
 			};
 		},
 	});
