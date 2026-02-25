@@ -1,7 +1,7 @@
 {
   "lastChangelogVersion": "0.55.0",
   "hideThinkingBlock": false,
-  "defaultProvider": "multicodex",
+  "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
   "defaultThinkingLevel": "medium",
@@ -38,7 +38,6 @@
       ]
     },
     "git:github.com/nicobailon/pi-subagents",
-    "npm:pi-multicodex",
     {
       "source": "git:github.com/nielpattin/pi-sub",
       "extensions": [
@@ -65,10 +64,11 @@
     "+extensions\\command-palette\\index.ts",
     "+extensions\\prompt-stash.ts",
     "+extensions\\cheap-commits\\index.ts",
-    "+extensions\\smart-sessions\\index.ts",
+    "-extensions\\smart-sessions\\index.ts",
     "+extensions\\handoff\\index.ts",
     "+extensions\\permissions\\index.ts",
-    "+extensions\\session-query\\index.ts",
+    "+extensions\\multicodex.ts",
+    "-extensions\\session-query\\index.ts",
     "+extensions\\agents-discovery\\index.ts",
     "-extensions\\modes\\index.ts",
     "-extensions\\image-paste-ui.ts",
