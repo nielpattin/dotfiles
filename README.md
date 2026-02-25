@@ -28,6 +28,11 @@ Covers:
 - Use `chezmoi add <target>` only if a file already exists in `~` and you want to import it into source.
 - Use `chezmoi re-add <target>` only if a managed target in `~` was manually changed and must be reconciled back to source.
 
+### Temporary downloads/clones policy
+- Use `~/.local/share/chezmoi/tmp` for throwaway downloads, cloned repos, extracted archives, and generated artifacts.
+- For `curl`/`wget`, `gh repo clone`, and `uvx github-dlr https://github.com/<user>/<repo>`, use `tmp/` as destination/workdir.
+- Do not place temporary fetched content in repo root or managed `dot_*` paths.
+
 ---
 
 ## 1) Prerequisites
@@ -263,6 +268,10 @@ cd ~/.local/share/chezmoi
 chezmoi status
 chezmoi diff
 chezmoi apply
+
+# temporary workspace for downloads/clones
+mkdir -p tmp
+cd tmp
 
 # import existing live file to source
 chezmoi add ~/.config/<path>
