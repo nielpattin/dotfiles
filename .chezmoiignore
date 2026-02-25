@@ -35,6 +35,7 @@ nul
 
 # Pi runtime/auth/cache (keep only selected config files)
 .pi/agent/auth.json
+.pi/agent/multicodex.json
 .pi/agent/sessions/**
 .pi/agent/cache/**
 .pi/agent/git/**

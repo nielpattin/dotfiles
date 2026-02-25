@@ -22,7 +22,7 @@
       "fetchStatus": true
     },
     "codex": {
-      "enabled": "auto",
+      "enabled": "on",
       "fetchStatus": true
     },
     "kiro": {
@@ -55,5 +55,5 @@
     "kiro",
     "zai"
   ],
-  "defaultProvider": null
+  "defaultProvider": "multicodex"
 }
