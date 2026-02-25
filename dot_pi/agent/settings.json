@@ -64,7 +64,7 @@
     "+extensions\\command-palette\\index.ts",
     "+extensions\\prompt-stash.ts",
     "+extensions\\cheap-commits\\index.ts",
-    "-extensions\\smart-sessions\\index.ts",
+    "+extensions\\smart-sessions\\index.ts",
     "+extensions\\handoff\\index.ts",
     "+extensions\\permissions\\index.ts",
     "+extensions\\multicodex.ts",

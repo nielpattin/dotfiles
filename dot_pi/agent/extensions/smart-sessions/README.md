@@ -16,6 +16,14 @@ Pi extension to auto-name sessions from the first real prompt (including `/skill
   - trims surrounding quotes
   - clamps to 100 chars max
 
+## Manual command
+
+Use `/autoname-sessions` to force naming when auto-naming did not trigger (for example, command-heavy starts).
+
+- `/autoname-sessions` -> uses the first user message in the current branch
+- `/autoname-sessions <text>` -> uses the provided text
+- `/autoname-sessions /skill:<name> <prompt>` -> applies `[skill]` prefix and names from prompt
+
 ## Title prompt behavior
 
 The model is instructed to:
