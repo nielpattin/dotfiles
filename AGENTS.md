@@ -11,6 +11,8 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 | `.chezmoi.toml.tmpl` | age encryption config + key identity path |
 | `.chezmoiexternal.toml` | external git-managed assets (opencode plugin) |
 | `.chezmoiignore` | excludes runtime/build/machine-specific state |
+| `.gitignore` | repo-local ignores (includes `tmp/` scratch workspace) |
+| `tmp/` | throwaway workspace for downloads/clones/extractions during agent tasks |
 | `Documents/PowerShell/` | generated PowerShell secret loader template |
 | `dot_agents/skills/` | shared skill library mirrored to `~/.agents/skills` |
 | `dot_config/` | maps to `~/.config/*` (opencode/nvim/fish/mise/etc.) |
@@ -28,13 +30,16 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 | Secret include/exclude policy | `.chezmoiignore` | Runtime/auth/session paths intentionally excluded |
 | External plugin pin/source | `.chezmoiexternal.toml` | `git-repo` source + branch/pull args |
 | Pi runtime config | `dot_pi/agent/settings.json` | extensions/skills/packages/model defaults |
-| Pi-specific repo guidance | `dot_pi/AGENTS.md`, `dot_pi/agent/AGENTS.md` | Nested guidance for Pi-only changes |
-| Opencode-specific guidance | `dot_config/opencode/AGENTS.md` | Nested guidance for opencode changes |
+| Pi-specific repo guidance | `dot_pi/AGENTS.md` | Scoped Pi notes (keep minimal) |
+| Opencode-specific guidance | `dot_config/opencode/AGENTS.md` | Scoped opencode notes |
 
 ## CONVENTIONS (PROJECT-SPECIFIC)
 - Source of truth is this chezmoi source repo; home directory is generated target.
 - Default flow: modify files in this repo, then run `chezmoi apply` to sync to `$HOME`.
+- Temporary external work (downloads/clones/extracts) must happen under `./tmp` only.
+- For `curl`/`wget`, `gh repo clone`, and `uvx github-dlr https://github.com/<user>/<repo>` operations, set destination/workdir to `./tmp`.
 - New tracked config/file: create it directly in source (`dot_*` path) rather than creating it in `~` first.
+- Prefer this root `AGENTS.md` for shared rules; add/expand nested `AGENTS.md` only for truly directory-specific constraints.
 - Use `chezmoi add <target>` only when importing an already-existing file from `~` into source.
 - Use `chezmoi re-add <target>` only when a managed target in `~` was changed manually and must be reconciled back to source.
 - Naming follows chezmoi mapping (`dot_*` → hidden targets under `$HOME`).
@@ -48,6 +53,7 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 - Modifying generated secret loader outputs directly (`private_secrets.ps1.tmpl`, `private_dot_bash_secrets.tmpl`, fish secret template).
 - Committing plaintext secrets or the age private key.
 - Committing runtime/session artifacts intentionally ignored by policy (`.pi/agent/sessions`, caches, local state).
+- Running `curl`, `uvx github-dlr`, repo clones, or other fetch/extract commands directly into repo root or managed `dot_*` paths.
 - Adding machine-specific absolute paths in templates when `$HOME`-portable pathing is possible.
 
 ## COMMANDS
@@ -59,6 +65,10 @@ cd ~/.local/share/chezmoi
 chezmoi status
 chezmoi diff
 chezmoi apply
+
+# temporary external work area (downloads/clones)
+mkdir -p tmp
+cd tmp
 
 # import existing live file -> source (when needed)
 chezmoi add ~/.config/<path>
