@@ -2,8 +2,7 @@
 - They use `pwsh` not `cmd` or `powershell` in their terminal.
 - By default pi use `bash` from Git for Windows, don't trying to run pwsh script with the bash tool.
 - Use `pwsh` only when the user explicitly tell you to run powershell script or when something needed to be run in powershell.
-- Pi coding agent config is in `C:\Users\niel\.pi\` folder so if user want to change something about extensions, skills, or agent settings, always check that folder first.
-- For pi internals tasks only, pi-mono repo is in `C:\Users\niel\repo\public\pi-mono\` folder
+- In this dotfiles repo, Pi config source is `$HOME/.local/share/chezmoi/dot_pi` (maps to live `$HOME/.pi`). Edit source first, then sync with `chezmoi apply`. Only check/edit live `~/.pi` directly when explicitly requested.
+- For pi internals tasks only, pi-mono repo is in `$HOME/repo/public/pi-mono` folder
 - When User want to install a new extension or packages always put git clone on the top piority over npm.
 - Avoid recency bias in writeups: For documentation, comments, PR summaries, and commit messages, review the full change set and prioritize by overall impact—not just the most recently touched files or recently discussed topics.
-- When working on the `~/.pi` folder when user provide a github repo link you can use gh cli to clone it to the `~/.pi/tmp` folder if user want to check out the code before install it as an extension or skill. Always ask user if they want to clone the repo to the `~/.pi/tmp` folder before clone it.
