@@ -429,7 +429,7 @@ export default function multicodexExtension(pi: ExtensionAPI) {
 			}
 
 			try {
-				ctx.ui.notify(`Starting login for ${email}...`, "info");
+				ctx.ui.notify("Starting login...", "info");
 				const creds = await loginOpenAICodex({
 					onAuth: ({ url }) => {
 						void openLoginInBrowser(pi, ctx, url);
@@ -440,7 +440,8 @@ export default function multicodexExtension(pi: ExtensionAPI) {
 
 				manager.addOrUpdateAccount(email, creds);
 				const active = manager.syncActiveToAuth(ctx);
-				ctx.ui.notify(`Saved ${email}${active ? " and synced to openai-codex" : ""}`, "info");
+				ctx.ui.setStatus("multicodex", undefined);
+				ctx.ui.notify(`Saved account${active ? " and synced to openai-codex" : ""}`, "info");
 			} catch (error) {
 				ctx.ui.notify(`Login failed: ${error instanceof Error ? error.message : String(error)}`, "error");
 			}
@@ -457,11 +458,18 @@ export default function multicodexExtension(pi: ExtensionAPI) {
 			}
 
 			const active = manager.getActiveAccount();
-			const options = accounts.map((a) => `${a.email}${active?.email === a.email ? " (active)" : ""}`);
-			const selected = await ctx.ui.select("Select account", options);
+			const accountOptions = accounts.map((account) => ({
+				email: account.email,
+				label: `${account.email}${active?.email === account.email ? " (active)" : ""}`,
+			}));
+			const selected = await ctx.ui.select(
+				"Select account",
+				accountOptions.map((option) => option.label),
+			);
 			if (!selected) return;
 
-			const email = selected.split(" (")[0] ?? "";
+			const selectedAccount = accountOptions.find((option) => option.label === selected);
+			const email = selectedAccount?.email ?? "";
 			if (!email) {
 				ctx.ui.notify("Invalid account selection", "error");
 				return;
@@ -480,7 +488,8 @@ export default function multicodexExtension(pi: ExtensionAPI) {
 				return;
 			}
 
-			ctx.ui.notify(`Switched to ${freshAccount.email} (openai-codex synced)`, "info");
+			ctx.ui.setStatus("multicodex", undefined);
+			ctx.ui.notify("Switched account (openai-codex synced)", "info");
 		},
 	});
 
@@ -526,15 +535,13 @@ export default function multicodexExtension(pi: ExtensionAPI) {
 
 	pi.on("session_start", async (_event, ctx) => {
 		lastContext = ctx;
-		const synced = manager.syncActiveToAuth(ctx);
-		if (!synced) return;
-		ctx.ui.setStatus("multicodex", synced.email);
+		manager.syncActiveToAuth(ctx);
+		ctx.ui.setStatus("multicodex", undefined);
 	});
 
 	pi.on("session_switch", async (_event, ctx) => {
 		lastContext = ctx;
-		const active = manager.getActiveAccount();
-		ctx.ui.setStatus("multicodex", active?.email);
+		ctx.ui.setStatus("multicodex", undefined);
 	});
 
 	// Keep lastContext used for future diagnostics without auto-notify spam.

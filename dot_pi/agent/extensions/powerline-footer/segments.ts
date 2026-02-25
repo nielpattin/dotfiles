@@ -406,7 +406,8 @@ const extensionStatusesSegment: StatusLineSegment = {
     if (parts.length === 0) return { content: "", visible: false };
 
     // Statuses already have their own styling applied by the extensions
-    const content = parts.join(` ${SEP_DOT} `);
+    const statusSeparator = "|";
+    const content = parts.join(` ${statusSeparator} `);
     return { content, visible: true };
   },
 };
