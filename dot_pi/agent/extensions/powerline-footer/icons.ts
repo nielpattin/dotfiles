@@ -16,6 +16,13 @@ export interface IconSet {
   session: string;
   auto: string;
   warning: string;
+
+  // Optional icons for extended/custom segments
+  thinking?: string;
+  timerRunning?: string;
+  timerDone?: string;
+  skills?: string;
+  mcp?: string;
 }
 
 // Separator characters
@@ -49,29 +56,35 @@ export function getThinkingText(level: string): string | undefined {
 
 // Nerd Font icons (matching oh-my-pi exactly)
 export const NERD_ICONS: IconSet = {
-  pi: "\uE22C",         // nf-oct-pi (stylized pi icon)
-  model: "\uEC19",      // nf-md-chip (model/AI chip)
-  folder: "\uF115",     // nf-fa-folder_open
-  branch: "\uF126",     // nf-fa-code_fork (git branch)
-  git: "\uF1D3",        // nf-fa-git (git logo)
-  tokens: "\uE26B",     // nf-seti-html (tokens symbol)
-  context: "\uE70F",    // nf-dev-database (database)
-  cost: "\uF155",       // nf-fa-dollar
-  time: "\uF017",       // nf-fa-clock_o
-  agents: "\uF0C0",     // nf-fa-users
-  cache: "\uF1C0",      // nf-fa-database (cache)
-  input: "\uF090",      // nf-fa-sign_in (input arrow)
-  output: "\uF08B",     // nf-fa-sign_out (output arrow)
-  host: "\uF109",       // nf-fa-laptop (host)
-  session: "\uF550",    // nf-md-identifier (session id)
-  auto: "\u{F0068}",    // nf-md-lightning_bolt (auto-compact)
-  warning: "\uF071",    // nf-fa-warning
+  pi: "\uE22C",           // nf-oct-pi (stylized pi icon)
+  model: "\uEC19",        // nf-md-chip (model/AI chip)
+  thinking: "\uF0EB",      // nf-fa-lightbulb_o
+  folder: "\uF115",       // nf-fa-folder_open
+  branch: "\uF126",       // nf-fa-code_fork (git branch)
+  git: "\uF1D3",          // nf-fa-git (git logo)
+  tokens: "\uE26B",       // nf-seti-html (tokens symbol)
+  context: "\uE70F",      // nf-dev-database (database)
+  cost: "\uF155",         // nf-fa-dollar
+  time: "\uF017",         // nf-fa-clock_o
+  timerRunning: "\u{F0150}", // nf-md-timer_sand
+  timerDone: "\u{F0151}", // nf-md-timer_sand_complete
+  agents: "\uF0C0",       // nf-fa-users
+  cache: "\uF1C0",        // nf-fa-database (cache)
+  input: "\uF090",        // nf-fa-sign_in (input arrow)
+  output: "\uF08B",       // nf-fa-sign_out (output arrow)
+  host: "\uF109",         // nf-fa-laptop (host)
+  session: "\uF550",      // nf-md-identifier (session id)
+  auto: "\u{F0068}",      // nf-md-lightning_bolt (auto-compact)
+  warning: "\uF071",      // nf-fa-warning
+  skills: "\u{F03D7}",    // nf-md-head_lightbulb
+  mcp: "\uF1E6",          // nf-fa-plug
 };
 
 // ASCII/Unicode fallback icons (matching oh-my-pi)
 export const ASCII_ICONS: IconSet = {
   pi: "π",
   model: "◈",
+  thinking: "💡",
   folder: "📁",
   branch: "⎇",
   git: "⎇",
@@ -79,6 +92,8 @@ export const ASCII_ICONS: IconSet = {
   context: "◫",
   cost: "$",
   time: "◷",
+  timerRunning: "⏳",
+  timerDone: "✓",
   agents: "AG",
   cache: "cache",
   input: "in:",
@@ -87,6 +102,8 @@ export const ASCII_ICONS: IconSet = {
   session: "id",
   auto: "⚡",
   warning: "⚠",
+  skills: "skills",
+  mcp: "mcp",
 };
 
 // Separator characters
@@ -132,19 +149,34 @@ export const ASCII_SEPARATORS: SeparatorChars = {
   dot: ".",
 };
 
-// Detect Nerd Font support (check TERM or specific env var)
+// Detect Nerd Font support (env var + terminal heuristics)
 export function hasNerdFonts(): boolean {
-  // User can set this env var to force Nerd Fonts
+  // Explicit override always wins
   if (process.env.POWERLINE_NERD_FONTS === "1") return true;
   if (process.env.POWERLINE_NERD_FONTS === "0") return false;
-  
-  // Check for Ghostty (survives into tmux via GHOSTTY_RESOURCES_DIR)
+
+  // Ghostty (survives into tmux via GHOSTTY_RESOURCES_DIR)
   if (process.env.GHOSTTY_RESOURCES_DIR) return true;
-  
-  // Check common terminals known to support Nerd Fonts (case-insensitive)
-  const term = (process.env.TERM_PROGRAM || "").toLowerCase();
-  const nerdTerms = ["iterm", "wezterm", "kitty", "ghostty", "alacritty"];
-  return nerdTerms.some(t => term.includes(t));
+
+  // TERM_PROGRAM-based detection (case-insensitive)
+  const termProgram = (process.env.TERM_PROGRAM || "").toLowerCase();
+  const nerdTerms = ["iterm", "wezterm", "kitty", "ghostty", "alacritty", "vscode"];
+  if (nerdTerms.some((t) => termProgram.includes(t))) return true;
+
+  // Windows Terminal / ConPTY sessions usually run with a configured Nerd Font
+  if (process.env.WT_SESSION) return true;
+  if (process.env.WT_PROFILE_ID) return true;
+
+  // TERM fallback hints
+  const term = (process.env.TERM || "").toLowerCase();
+  if (term.includes("xterm-kitty") || term.includes("wezterm") || term.includes("alacritty")) {
+    return true;
+  }
+
+  // Windows default: prefer Nerd icons unless explicitly disabled
+  if (process.platform === "win32") return true;
+
+  return false;
 }
 
 export function getIcons(): IconSet {
