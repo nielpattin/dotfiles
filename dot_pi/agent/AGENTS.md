@@ -2,6 +2,7 @@
 - They use `pwsh` not `cmd` or `powershell` in their terminal.
 - By default pi use `bash` from Git for Windows, don't trying to run pwsh script with the bash tool.
 - Use `pwsh` only when the user explicitly tell you to run powershell script or when something needed to be run in powershell.
+- For interactive PowerShell commands, use the `pwsh_shell` tool and open with `loadProfile: true` by default (unless the user explicitly asks for no profile).
 - In this dotfiles repo, Pi config source is `$HOME/.local/share/chezmoi/dot_pi` (maps to live `$HOME/.pi`). Edit source first, then sync with `chezmoi apply`. Only check/edit live `~/.pi` directly when explicitly requested.
 - For pi internals tasks only, pi-mono repo is in `$HOME/repo/public/pi-mono` folder
 - When User want to install a new extension or packages always put git clone on the top piority over npm.
