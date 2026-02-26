@@ -2,7 +2,7 @@
 
 Restore files as you move through Pi conversation history.
 
-This extension adds file snapshots so `/tree`, `/fork`, `/undo`, and `/redo` can restore code to specific points in the session.
+This extension adds file snapshots so `/tree`, `/fork`, `/undo`, `/redo`, and `/checkpoint-list` can restore code to specific points in the session.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ This extension adds file snapshots so `/tree`, `/fork`, `/undo`, and `/redo` can
 1. Open Pi in a Git repo.
 2. Ask Pi to edit files.
 3. Use `/tree` or `/fork` and pick a restore option.
-4. Use `/undo` and `/redo` to move across checkpoint history.
+4. Use `/undo`, `/redo`, or `/checkpoint-list` to move across checkpoint history.
 
 ---
 
@@ -48,11 +48,18 @@ Snapshots are stored as git refs under `refs/pi-checkpoints/`.
 2. **Each user turn**
    - Creates a user-node snapshot (`checkpoint-*`) **only when repo tree changed**
 3. **Assistant completion**
-   - Creates/updates latest assistant snapshot (`checkpoint-assistant-*`) **only when repo tree changed**
+   - Creates an assistant-node snapshot (`checkpoint-assistant-*`) **only when repo tree changed**
+   - Keeps only the newest assistant snapshot for the session
    - Read-only turns (no file changes) do not create user or assistant checkpoints
-   - Old assistant snapshot is replaced when a new one is created
 4. **Tool/result nodes**
    - No dedicated snapshot
+
+### Tree checkpoint markers
+
+- Entries with checkpoints get numbered tree labels:
+  - `rewind:U1`, `rewind:U2`, ... (user checkpoints)
+  - `rewind:A1`, `rewind:A2`, ... (assistant checkpoints)
+- Extension does not overwrite existing custom labels
 
 ---
 
@@ -94,6 +101,12 @@ Important:
 - Timeline excludes:
   - `checkpoint-resume-*` (resume is for `/fork` fallback only)
 
+### Checkpoint picker
+
+- `/checkpoint-list` shows numbered checkpoints for current session (e.g. `U2`, `A2`)
+- Each row includes time + truncated text preview from that node
+- Pick one entry to restore files and jump tree to that checkpoint node
+
 ### Clear checkpoints for current session
 
 - `/clear-checkpoint` deletes rewind refs for the active Pi session only
@@ -104,7 +117,7 @@ Important:
 ## What file restore does
 
 - Restores worktree files from snapshot
-- Preserves staged changes
+- Does not auto-stage files during restore
 - Does not auto-delete unrelated untracked files
 
 If you want untracked cleanup:

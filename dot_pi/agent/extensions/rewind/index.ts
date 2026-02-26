@@ -17,6 +17,9 @@ const BEFORE_RESTORE_PREFIX = "before-restore-";
 const ASSISTANT_CHECKPOINT_PREFIX = "checkpoint-assistant-";
 const MAX_CHECKPOINTS = 100;
 const STATUS_KEY = "restore";
+const CHECKPOINT_LABEL_PREFIX = "rewind:";
+const LEGACY_CHECKPOINT_LABEL_USER = "rewind:user";
+const LEGACY_CHECKPOINT_LABEL_ASSISTANT = "rewind:assistant";
 const SETTINGS_FILE = join(homedir(), ".pi", "agent", "settings.json");
 
 type ExecFn = (cmd: string, args: string[]) => Promise<{ stdout: string; stderr: string; code: number }>;
@@ -47,8 +50,19 @@ function sanitizeForRef(id: string): string {
   return id.replace(/[^a-zA-Z0-9-]/g, "_");
 }
 
+function isManagedCheckpointLabel(label: string | undefined): boolean {
+  if (!label) return false;
+  if (label === LEGACY_CHECKPOINT_LABEL_USER || label === LEGACY_CHECKPOINT_LABEL_ASSISTANT) return true;
+  return /^rewind:[UA]\d+$/.test(label);
+}
+
+function formatCheckpointTime(timestamp: number): string {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return "unknown";
+  return new Date(timestamp).toLocaleTimeString();
+}
+
 export default function (pi: ExtensionAPI) {
-  // Snapshot per entry ID (user nodes + latest assistant node)
+  // Snapshot per entry ID (user + assistant nodes that have checkpoints)
   const checkpoints = new Map<string, string>();
   let resumeCheckpoint: string | null = null;
   let repoRoot: string | null = null;
@@ -71,13 +85,141 @@ export default function (pi: ExtensionAPI) {
     if (!ctx.hasUI) return;
     if (getSilentCheckpointsSetting()) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
-      return;
+    } else {
+      const theme = ctx.ui.theme;
+      const count = checkpoints.size;
+      ctx.ui.setStatus(STATUS_KEY, theme.fg("dim", "◆ ") + theme.fg("muted", `${count} checkpoint${count === 1 ? "" : "s"}`));
     }
-    const theme = ctx.ui.theme;
-    const count = checkpoints.size;
-    ctx.ui.setStatus(STATUS_KEY, theme.fg("dim", "◆ ") + theme.fg("muted", `${count} checkpoint${count === 1 ? "" : "s"}`));
   }
   
+  function getSessionEntries(sessionManager: any): any[] {
+    const entries = sessionManager.getEntries?.();
+    if (Array.isArray(entries)) {
+      return entries.filter((entry) => typeof entry?.id === "string");
+    }
+
+    const leafId = sessionManager.getLeafId?.();
+    const branch = sessionManager.getBranch?.(leafId);
+    if (Array.isArray(branch)) {
+      return branch.filter((entry) => typeof entry?.id === "string");
+    }
+
+    return [];
+  }
+
+  function buildSanitizedEntryIdLookup(sessionManager: any): Map<string, string> {
+    const lookup = new Map<string, string>();
+    for (const entry of getSessionEntries(sessionManager)) {
+      const sanitized = sanitizeForRef(entry.id);
+      if (!lookup.has(sanitized)) {
+        lookup.set(sanitized, entry.id);
+      }
+    }
+    return lookup;
+  }
+
+  function resolveEntryIdFromSanitized(sessionManager: any, sanitizedEntryId: string): string | null {
+    const lookup = buildSanitizedEntryIdLookup(sessionManager);
+    return lookup.get(sanitizedEntryId) ?? null;
+  }
+
+  function buildCheckpointBadgeMap(checkpointIds: string[]): Map<string, string> {
+    const sorted = [...new Set(checkpointIds)].sort((a, b) => {
+      const timestampDiff = extractCheckpointTimestamp(a) - extractCheckpointTimestamp(b);
+      return timestampDiff !== 0 ? timestampDiff : a.localeCompare(b);
+    });
+
+    const badges = new Map<string, string>();
+    let userCount = 0;
+    let assistantWithoutUserCount = 0;
+
+    for (const checkpointId of sorted) {
+      if (checkpointId.startsWith(ASSISTANT_CHECKPOINT_PREFIX)) {
+        const assistantNumber = userCount > 0 ? userCount : ++assistantWithoutUserCount;
+        badges.set(checkpointId, `A${assistantNumber}`);
+        continue;
+      }
+
+      userCount += 1;
+      badges.set(checkpointId, `U${userCount}`);
+    }
+
+    return badges;
+  }
+
+  function truncatePreviewText(text: string, maxLength = 56): string {
+    const compact = text.replace(/\s+/g, " ").trim();
+    if (!compact) return "(no text)";
+    if (compact.length <= maxLength) return compact;
+    return `${compact.slice(0, Math.max(1, maxLength - 1)).trimEnd()}…`;
+  }
+
+  function getEntryPreviewText(sessionManager: any, entryId: string | null): string {
+    if (!entryId) return "unknown";
+
+    const entry = sessionManager.getEntry?.(entryId);
+    if (!entry) {
+      return entryId.slice(0, 8);
+    }
+
+    if (entry.type !== "message") {
+      return `(${entry.type})`;
+    }
+
+    const role = entry.message?.role;
+    const content = Array.isArray(entry.message?.content) ? entry.message.content : [];
+
+    for (const item of content) {
+      if (item?.type === "text" && typeof item.text === "string" && item.text.trim()) {
+        return truncatePreviewText(item.text);
+      }
+    }
+
+    if (typeof role === "string" && role.length > 0) {
+      return `(${role})`;
+    }
+
+    return "(message)";
+  }
+
+  function syncCheckpointLabels(ctx: ExtensionContext) {
+    if (!ctx.hasUI) return;
+
+    const sessionManager = ctx.sessionManager as any;
+    const entries = getSessionEntries(sessionManager);
+    const lookup = buildSanitizedEntryIdLookup(sessionManager);
+    const badgeMap = buildCheckpointBadgeMap([...checkpoints.values()]);
+    const activeCheckpointEntryIds = new Set<string>();
+
+    for (const [sanitizedEntryId, checkpointId] of checkpoints.entries()) {
+      const rawEntryId = lookup.get(sanitizedEntryId);
+      if (!rawEntryId) continue;
+
+      const badge = badgeMap.get(checkpointId);
+      if (!badge) continue;
+
+      const desiredLabel = `${CHECKPOINT_LABEL_PREFIX}${badge}`;
+      const currentLabel = sessionManager.getLabel?.(rawEntryId) as string | undefined;
+
+      // Don't override user-managed labels.
+      if (currentLabel && !isManagedCheckpointLabel(currentLabel) && currentLabel !== desiredLabel) {
+        continue;
+      }
+
+      if (currentLabel !== desiredLabel) {
+        pi.setLabel(rawEntryId, desiredLabel);
+      }
+      activeCheckpointEntryIds.add(rawEntryId);
+    }
+
+    for (const entry of entries) {
+      const currentLabel = sessionManager.getLabel?.(entry.id) as string | undefined;
+      if (!isManagedCheckpointLabel(currentLabel)) continue;
+      if (activeCheckpointEntryIds.has(entry.id)) continue;
+      pi.setLabel(entry.id, undefined);
+    }
+  }
+
   /**
    * Reset all state for a fresh session
    */
@@ -126,7 +268,7 @@ export default function (pi: ExtensionAPI) {
           const entryId = assistantMatch[3];
           if (!refSessionId || !entryId) continue;
 
-          // Keep only newest assistant snapshot for this session
+          // Keep only newest assistant snapshot for this session.
           if (refSessionId === currentSessionId && !latestAssistantSnapshot) {
             latestAssistantSnapshot = { entryId, checkpointId };
             checkpoints.set(entryId, checkpointId);
@@ -201,15 +343,6 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  async function getStagedPaths(exec: ExecFn): Promise<string[]> {
-    try {
-      const result = await exec("git", ["diff", "--name-only", "--cached", "-z"]);
-      return result.stdout.split("\0").filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-
   async function restoreWithBackup(
     exec: ExecFn,
     targetRef: string,
@@ -232,14 +365,14 @@ export default function (pi: ExtensionAPI) {
         await exec("git", ["update-ref", "-d", existingBackupRefName]);
       }
 
-      const stagedPaths = await getStagedPaths(exec);
-
-      const restoreArgs = ["restore", "--worktree", "--source", targetRef, "--", "."];
-      if (stagedPaths.length > 0) {
-        restoreArgs.push(...stagedPaths.map((p) => `:(exclude,top,literal)${p}`));
-      }
-
-      await exec("git", restoreArgs);
+      await exec("git", [
+        "restore",
+        "--worktree",
+        "--source",
+        targetRef,
+        "--",
+        ".",
+      ]);
       return true;
     } catch (err) {
       notify(`Failed to restore: ${err}`, "error");
@@ -411,7 +544,9 @@ export default function (pi: ExtensionAPI) {
    * Find the most recent user message in the current branch.
    * Used at turn_end to find the user message that triggered the agent loop.
    */
-  function findUserMessageEntry(sessionManager: { getLeafId(): string | null; getBranch(id?: string): any[] }): { id: string } | null {
+  function findUserMessageEntry(
+    sessionManager: { getLeafId(): string | null; getBranch(id?: string): any[] },
+  ): { id: string; parentId?: string | null } | null {
     const leafId = sessionManager.getLeafId();
     if (!leafId) return null;
 
@@ -449,7 +584,7 @@ export default function (pi: ExtensionAPI) {
         return checkpointId.startsWith(`${ASSISTANT_CHECKPOINT_PREFIX}${currentSessionId}-`);
       });
 
-      // Keep only the newest assistant snapshot for this session.
+      // Keep only newest assistant snapshot for this session.
       if (assistantRefs.length > 1) {
         const toDelete = assistantRefs.slice(0, assistantRefs.length - 1);
         for (const ref of toDelete) {
@@ -564,6 +699,9 @@ export default function (pi: ExtensionAPI) {
     // Only loads checkpoints belonging to this session
     await rebuildCheckpointsMap(pi.exec, sessionId);
 
+    // Normalize refs for this session (e.g. keep only newest assistant snapshot).
+    await pruneCheckpoints(pi.exec, sessionId);
+
     // Create a resume checkpoint for the current state (session-scoped like other checkpoints)
     const checkpointId = `checkpoint-resume-${sessionId}-${Date.now()}`;
 
@@ -576,7 +714,8 @@ export default function (pi: ExtensionAPI) {
     } catch {
       // Silent failure - resume checkpoint is optional
     }
-    
+
+    syncCheckpointLabels(ctx);
     updateStatus(ctx);
   }
 
@@ -587,9 +726,10 @@ export default function (pi: ExtensionAPI) {
       const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
 
       await navigateCheckpointHistory("undo", currentSessionId, notify, async (entryId) => {
+        const targetId = resolveEntryIdFromSanitized(ctx.sessionManager as any, entryId) ?? entryId;
         skipNextTreeRestorePrompt = true;
         try {
-          await ctx.navigateTree(entryId, { summarize: false });
+          await ctx.navigateTree(targetId, { summarize: false });
         } finally {
           if (skipNextTreeRestorePrompt) {
             skipNextTreeRestorePrompt = false;
@@ -606,15 +746,93 @@ export default function (pi: ExtensionAPI) {
       const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
 
       await navigateCheckpointHistory("redo", currentSessionId, notify, async (entryId) => {
+        const targetId = resolveEntryIdFromSanitized(ctx.sessionManager as any, entryId) ?? entryId;
         skipNextTreeRestorePrompt = true;
         try {
-          await ctx.navigateTree(entryId, { summarize: false });
+          await ctx.navigateTree(targetId, { summarize: false });
         } finally {
           if (skipNextTreeRestorePrompt) {
             skipNextTreeRestorePrompt = false;
           }
         }
       });
+    },
+  });
+
+  pi.registerCommand("checkpoint-list", {
+    description: "List checkpoints and restore to selected checkpoint",
+    handler: async (_args, ctx: ExtensionCommandContext) => {
+      const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
+      const currentSessionId = ctx.sessionManager.getSessionId();
+
+      try {
+        const result = await pi.exec("git", ["rev-parse", "--is-inside-work-tree"]);
+        if (result.stdout.trim() !== "true") {
+          notify("Not in a Git repository", "warning");
+          return;
+        }
+      } catch {
+        notify("Not in a Git repository", "warning");
+        return;
+      }
+
+      const timeline = await getCheckpointTimeline(currentSessionId);
+      if (timeline.length === 0) {
+        notify("No checkpoints available", "info");
+        return;
+      }
+
+      const timelineDescending = [...timeline].reverse();
+      const sessionManager = ctx.sessionManager as any;
+      const lookup = buildSanitizedEntryIdLookup(sessionManager);
+      const badgeMap = buildCheckpointBadgeMap(timeline);
+
+      const items = timelineDescending.map((checkpointId) => {
+        const timestamp = formatCheckpointTime(extractCheckpointTimestamp(checkpointId));
+        const checkpointEntryId = extractCheckpointEntryId(checkpointId);
+        const resolvedEntryId = checkpointEntryId ? lookup.get(checkpointEntryId) ?? checkpointEntryId : null;
+        const badge = badgeMap.get(checkpointId) ?? (checkpointId.startsWith(ASSISTANT_CHECKPOINT_PREFIX) ? "A?" : "U?");
+        const preview = getEntryPreviewText(sessionManager, resolvedEntryId);
+        const label = `[${badge}] ${timestamp} · ${preview}`;
+
+        return { checkpointId, resolvedEntryId, label };
+      });
+
+      const selectedLabel = await ctx.ui.select("Rewind checkpoints", items.map((item) => item.label));
+      if (!selectedLabel) return;
+
+      const selectedItem = items.find((item) => item.label === selectedLabel);
+      if (!selectedItem) {
+        notify("Selected checkpoint is not available", "warning");
+        return;
+      }
+
+      const success = await restoreWithBackup(
+        pi.exec,
+        `${REF_PREFIX}${selectedItem.checkpointId}`,
+        currentSessionId,
+        notify,
+      );
+
+      if (!success) {
+        return;
+      }
+
+      historyCursorCheckpointId = selectedItem.checkpointId;
+
+      const targetId = selectedItem.resolvedEntryId;
+      if (targetId) {
+        skipNextTreeRestorePrompt = true;
+        try {
+          await ctx.navigateTree(targetId, { summarize: false });
+        } finally {
+          if (skipNextTreeRestorePrompt) {
+            skipNextTreeRestorePrompt = false;
+          }
+        }
+      }
+
+      notify("Restored selected checkpoint", "info");
     },
   });
 
@@ -643,6 +861,7 @@ export default function (pi: ExtensionAPI) {
       pendingCheckpoint = null;
       historyCursorCheckpointId = null;
 
+      syncCheckpointLabels(ctx);
       updateStatus(ctx);
 
       if (deletedCount === 0) {
@@ -665,21 +884,26 @@ export default function (pi: ExtensionAPI) {
   pi.on("turn_start", async (event, ctx) => {
     if (!ctx.hasUI) return;
     if (!isGitRepo) return;
-    
-    // Only capture at the start of a new agent loop (first turn).
-    // This is when a user message triggers the agent - we want to snapshot
-    // the file state BEFORE any tools execute.
-    if (event.turnIndex !== 0) return;
+
+    // Capture once per agent loop (before first effective tool-side changes).
+    // We don't rely on event.turnIndex semantics; instead we only capture when
+    // there is no pending snapshot yet.
+    if (pendingCheckpoint) return;
 
     try {
       // Capture worktree state now, but don't create the ref yet.
-      // At this point, the user message hasn't been appended to the session,
-      // so we don't know its entry ID. We'll create the ref at turn_end.
+      // At this point, the triggering user message may not be the leaf yet,
+      // so we defer ref creation until turn_end.
       const commitSha = await captureWorktree();
       pendingCheckpoint = { commitSha, timestamp: event.timestamp };
     } catch {
       pendingCheckpoint = null;
     }
+  });
+
+  pi.on("agent_end", async () => {
+    // Safety reset: never carry pending turn snapshot across prompts.
+    pendingCheckpoint = null;
   });
 
   pi.on("turn_end", async (event, ctx) => {
@@ -694,7 +918,7 @@ export default function (pi: ExtensionAPI) {
     let consumedPendingCheckpoint = false;
 
     try {
-      // Maintain exactly one snapshot for the latest assistant node.
+      // Create assistant-node snapshots only when repo changed.
       const leafId = ctx.sessionManager.getLeafId();
       const leafEntry = leafId ? ctx.sessionManager.getEntry(leafId) : undefined;
       const isAssistantLeaf =
@@ -725,6 +949,7 @@ export default function (pi: ExtensionAPI) {
               createdUserCheckpointId = checkpointId;
               changed = true;
             }
+
           }
         }
 
@@ -754,7 +979,7 @@ export default function (pi: ExtensionAPI) {
             assistantCommitSha,
           ]);
 
-          // Remove previous latest assistant snapshot so only one A-node snapshot remains.
+          // Keep only one assistant snapshot: the newest one.
           if (latestAssistantSnapshot && latestAssistantSnapshot.checkpointId !== assistantCheckpointId) {
             await pi.exec("git", ["update-ref", "-d", `${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`]).catch(() => {});
             if (checkpoints.get(latestAssistantSnapshot.entryId) === latestAssistantSnapshot.checkpointId) {
@@ -782,6 +1007,7 @@ export default function (pi: ExtensionAPI) {
           historyCursorCheckpointId = createdUserCheckpointId;
         }
 
+        syncCheckpointLabels(ctx);
         updateStatus(ctx);
       }
     } catch {
