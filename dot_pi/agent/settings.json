@@ -1,10 +1,10 @@
 {
-  "lastChangelogVersion": "0.55.0",
+  "lastChangelogVersion": "0.55.1",
   "hideThinkingBlock": false,
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "theme": "catppuccin-mocha",
   "transport": "sse",
   "packages": [
@@ -23,7 +23,7 @@
         "-raw-paste\\index.ts",
         "+usage-extension\\index.ts",
         "+tab-status\\tab-status.ts",
-        "+arcade\\tetris.ts"
+        "-arcade\\tetris.ts"
       ],
       "skills": [
         "-extending-pi\\skill-creator\\SKILL.md",
@@ -60,16 +60,7 @@
     "-..\\..\\.agents\\skills\\commit-message-generator\\SKILL.md"
   ],
   "extensions": [
-    "+extensions\\tools.ts",
-    "+extensions\\command-palette\\index.ts",
-    "+extensions\\prompt-stash.ts",
-    "+extensions\\cheap-commits\\index.ts",
-    "+extensions\\smart-sessions\\index.ts",
-    "+extensions\\handoff\\index.ts",
-    "+extensions\\permissions\\index.ts",
-    "+extensions\\multicodex.ts",
     "-extensions\\session-query\\index.ts",
-    "+extensions\\agents-discovery\\index.ts",
     "-extensions\\modes\\index.ts",
     "-extensions\\image-paste-ui.ts",
     "-extensions\\working-vibes\\index.ts"
