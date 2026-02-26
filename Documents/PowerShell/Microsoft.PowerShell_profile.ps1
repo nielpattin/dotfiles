@@ -36,9 +36,10 @@ function Build-StarshipCache {
     # Get the full init script
     $initScript = & starship init powershell --print-full-init | Out-String
     
-    # Pre-compute the continuation prompt (this is what was taking 200ms!)
-    $continuationPrompt = & 'C:\Program Files\starship\bin\starship.exe' prompt --continuation 2>$null
-    
+    # Use an ASCII continuation prompt to avoid Unicode mojibake in cached init
+    # and keep multiline commands visually clean.
+    $continuationPrompt = '>> '
+
     # Escape the continuation prompt for embedding in PowerShell string
     $escapedPrompt = $continuationPrompt -replace "'", "''"
     
@@ -54,8 +55,16 @@ function Build-StarshipCache {
 Measure-ProfileSection "Starship (cached)" {
     $useCache = $false
     if (Test-Path $Script:StarshipCacheFile) {
-        $cacheAge = (Get-Date) - (Get-Item $Script:StarshipCacheFile).LastWriteTime
-        if ($cacheAge -lt $Script:StarshipCacheMaxAge) {
+        $cacheItem = Get-Item $Script:StarshipCacheFile
+        $cacheAge = (Get-Date) - $cacheItem.LastWriteTime
+
+        # Rebuild cache when profile changes so prompt fixes apply immediately.
+        $profileIsNewerThanCache = $false
+        if (Test-Path $PROFILE) {
+            $profileIsNewerThanCache = (Get-Item $PROFILE).LastWriteTime -gt $cacheItem.LastWriteTime
+        }
+
+        if ($cacheAge -lt $Script:StarshipCacheMaxAge -and -not $profileIsNewerThanCache) {
             $useCache = $true
         }
     }
