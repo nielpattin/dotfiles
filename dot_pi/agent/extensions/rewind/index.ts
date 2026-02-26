@@ -261,6 +261,35 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  async function getTreeShaForObject(exec: ExecFn, objectRef: string): Promise<string | null> {
+    try {
+      const result = await exec("git", ["rev-parse", `${objectRef}^{tree}`]);
+      const treeSha = result.stdout.trim();
+      return treeSha || null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function hasSameTreeAsAny(
+    exec: ExecFn,
+    commitSha: string,
+    targets: string[],
+  ): Promise<boolean> {
+    const snapshotTreeSha = await getTreeShaForObject(exec, commitSha);
+    if (!snapshotTreeSha) return false;
+
+    const dedupedTargets = Array.from(new Set(targets.filter(Boolean)));
+    for (const target of dedupedTargets) {
+      const targetTreeSha = await getTreeShaForObject(exec, target);
+      if (targetTreeSha && targetTreeSha === snapshotTreeSha) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   function extractCheckpointTimestamp(checkpointId: string): number {
     const userMatch = checkpointId.match(/^checkpoint-[a-f0-9-]{36}-(\d+)-.+$/);
     if (userMatch?.[1]) return Number(userMatch[1]);
@@ -477,6 +506,36 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
+  async function clearSessionCheckpoints(exec: ExecFn, currentSessionId: string): Promise<number> {
+    try {
+      const result = await exec("git", [
+        "for-each-ref",
+        "--format=%(refname)",
+        REF_PREFIX,
+      ]);
+
+      const refs = result.stdout.trim().split("\n").filter(Boolean);
+      const refsToDelete = refs.filter((ref) => {
+        const checkpointId = ref.replace(REF_PREFIX, "");
+
+        if (checkpointId.startsWith(`checkpoint-${currentSessionId}-`)) return true;
+        if (checkpointId.startsWith(`${ASSISTANT_CHECKPOINT_PREFIX}${currentSessionId}-`)) return true;
+        if (checkpointId.startsWith(`checkpoint-resume-${currentSessionId}-`)) return true;
+        if (checkpointId.startsWith(`${BEFORE_RESTORE_PREFIX}${currentSessionId}-`)) return true;
+
+        return false;
+      });
+
+      for (const ref of refsToDelete) {
+        await exec("git", ["update-ref", "-d", ref]);
+      }
+
+      return refsToDelete.length;
+    } catch {
+      return 0;
+    }
+  }
+
   /**
    * Initialize the extension for the current session/repo
    */
@@ -559,6 +618,42 @@ export default function (pi: ExtensionAPI) {
     },
   });
 
+  pi.registerCommand("clear-checkpoint", {
+    description: "Delete rewind checkpoints for the current session",
+    handler: async (_args, ctx: ExtensionCommandContext) => {
+      const notify = ctx.hasUI ? ctx.ui.notify.bind(ctx.ui) : () => {};
+      const currentSessionId = ctx.sessionManager.getSessionId();
+
+      try {
+        const result = await pi.exec("git", ["rev-parse", "--is-inside-work-tree"]);
+        if (result.stdout.trim() !== "true") {
+          notify("Not in a Git repository", "warning");
+          return;
+        }
+      } catch {
+        notify("Not in a Git repository", "warning");
+        return;
+      }
+
+      const deletedCount = await clearSessionCheckpoints(pi.exec, currentSessionId);
+
+      checkpoints.clear();
+      latestAssistantSnapshot = null;
+      resumeCheckpoint = null;
+      pendingCheckpoint = null;
+      historyCursorCheckpointId = null;
+
+      updateStatus(ctx);
+
+      if (deletedCount === 0) {
+        notify("No checkpoints found for this session", "info");
+        return;
+      }
+
+      notify(`Cleared ${deletedCount} checkpoint${deletedCount === 1 ? "" : "s"}`, "info");
+    },
+  });
+
   pi.on("session_start", async (_event, ctx) => {
     await initializeForSession(ctx);
   });
@@ -596,26 +691,9 @@ export default function (pi: ExtensionAPI) {
     let createdUserCheckpointId: string | null = null;
     let createdAssistantCheckpointId: string | null = null;
 
-    try {
-      // On first turn, map the pending pre-turn snapshot to the triggering user node.
-      if (event.turnIndex === 0 && pendingCheckpoint) {
-        const userEntry = findUserMessageEntry(ctx.sessionManager);
-        if (userEntry) {
-          const sanitizedEntryId = sanitizeForRef(userEntry.id);
-          if (!checkpoints.has(sanitizedEntryId)) {
-            const checkpointId = `checkpoint-${sessionId}-${pendingCheckpoint.timestamp}-${sanitizedEntryId}`;
-            await pi.exec("git", [
-              "update-ref",
-              `${REF_PREFIX}${checkpointId}`,
-              pendingCheckpoint.commitSha,
-            ]);
-            checkpoints.set(sanitizedEntryId, checkpointId);
-            createdUserCheckpointId = checkpointId;
-            changed = true;
-          }
-        }
-      }
+    let consumedPendingCheckpoint = false;
 
+    try {
       // Maintain exactly one snapshot for the latest assistant node.
       const leafId = ctx.sessionManager.getLeafId();
       const leafEntry = leafId ? ctx.sessionManager.getEntry(leafId) : undefined;
@@ -626,26 +704,73 @@ export default function (pi: ExtensionAPI) {
       if (leafId && isAssistantLeaf) {
         const leafKey = sanitizeForRef(leafId);
         const assistantCommitSha = await captureWorktree();
-        const assistantCheckpointId = `${ASSISTANT_CHECKPOINT_PREFIX}${sessionId}-${Date.now()}-${leafKey}`;
 
-        await pi.exec("git", [
-          "update-ref",
-          `${REF_PREFIX}${assistantCheckpointId}`,
-          assistantCommitSha,
-        ]);
+        const hasRepoChangesSinceTurnStart = pendingCheckpoint
+          ? !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, [pendingCheckpoint.commitSha]))
+          : true;
 
-        // Remove previous latest assistant snapshot so only one A-node snapshot remains.
-        if (latestAssistantSnapshot && latestAssistantSnapshot.checkpointId !== assistantCheckpointId) {
-          await pi.exec("git", ["update-ref", "-d", `${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`]).catch(() => {});
-          if (checkpoints.get(latestAssistantSnapshot.entryId) === latestAssistantSnapshot.checkpointId) {
-            checkpoints.delete(latestAssistantSnapshot.entryId);
+        // Only create a user checkpoint when the repo actually changed during this turn.
+        if (pendingCheckpoint && hasRepoChangesSinceTurnStart) {
+          const userEntry = findUserMessageEntry(ctx.sessionManager);
+          if (userEntry) {
+            const sanitizedEntryId = sanitizeForRef(userEntry.id);
+            if (!checkpoints.has(sanitizedEntryId)) {
+              const checkpointId = `checkpoint-${sessionId}-${pendingCheckpoint.timestamp}-${sanitizedEntryId}`;
+              await pi.exec("git", [
+                "update-ref",
+                `${REF_PREFIX}${checkpointId}`,
+                pendingCheckpoint.commitSha,
+              ]);
+              checkpoints.set(sanitizedEntryId, checkpointId);
+              createdUserCheckpointId = checkpointId;
+              changed = true;
+            }
           }
         }
 
-        checkpoints.set(leafKey, assistantCheckpointId);
-        latestAssistantSnapshot = { entryId: leafKey, checkpointId: assistantCheckpointId };
-        createdAssistantCheckpointId = assistantCheckpointId;
-        changed = true;
+        const comparisonTargets: string[] = [];
+        if (latestAssistantSnapshot?.checkpointId) {
+          comparisonTargets.push(`${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`);
+        }
+        if (createdUserCheckpointId) {
+          comparisonTargets.push(`${REF_PREFIX}${createdUserCheckpointId}`);
+        }
+        if (historyCursorCheckpointId) {
+          comparisonTargets.push(`${REF_PREFIX}${historyCursorCheckpointId}`);
+        }
+        if (pendingCheckpoint?.commitSha) {
+          comparisonTargets.push(pendingCheckpoint.commitSha);
+        }
+
+        const hasRepoChanges = hasRepoChangesSinceTurnStart &&
+          !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, comparisonTargets));
+
+        if (hasRepoChanges) {
+          const assistantCheckpointId = `${ASSISTANT_CHECKPOINT_PREFIX}${sessionId}-${Date.now()}-${leafKey}`;
+
+          await pi.exec("git", [
+            "update-ref",
+            `${REF_PREFIX}${assistantCheckpointId}`,
+            assistantCommitSha,
+          ]);
+
+          // Remove previous latest assistant snapshot so only one A-node snapshot remains.
+          if (latestAssistantSnapshot && latestAssistantSnapshot.checkpointId !== assistantCheckpointId) {
+            await pi.exec("git", ["update-ref", "-d", `${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`]).catch(() => {});
+            if (checkpoints.get(latestAssistantSnapshot.entryId) === latestAssistantSnapshot.checkpointId) {
+              checkpoints.delete(latestAssistantSnapshot.entryId);
+            }
+          }
+
+          checkpoints.set(leafKey, assistantCheckpointId);
+          latestAssistantSnapshot = { entryId: leafKey, checkpointId: assistantCheckpointId };
+          createdAssistantCheckpointId = assistantCheckpointId;
+          changed = true;
+        }
+
+        if (pendingCheckpoint) {
+          consumedPendingCheckpoint = true;
+        }
       }
 
       if (changed) {
@@ -662,7 +787,7 @@ export default function (pi: ExtensionAPI) {
     } catch {
       // Silent failure - checkpoint creation is not critical
     } finally {
-      if (event.turnIndex === 0) {
+      if (consumedPendingCheckpoint) {
         pendingCheckpoint = null;
       }
     }

@@ -63,7 +63,8 @@
     "-extensions\\session-query\\index.ts",
     "-extensions\\modes\\index.ts",
     "-extensions\\image-paste-ui.ts",
-    "-extensions\\working-vibes\\index.ts"
+    "-extensions\\working-vibes\\index.ts",
+    "+extensions\\figma-start.ts"
   ],
   "workingVibeModel": "openai-codex/gpt-5.3-codex",
   "workingVibe": "game-dev",

@@ -46,10 +46,11 @@ Snapshots are stored as git refs under `refs/pi-checkpoints/`.
 1. **Session start**
    - Creates `checkpoint-resume-*` (fallback restore point)
 2. **Each user turn**
-   - Creates a user-node snapshot (`checkpoint-*`)
+   - Creates a user-node snapshot (`checkpoint-*`) **only when repo tree changed**
 3. **Assistant completion**
-   - Keeps exactly one latest assistant snapshot (`checkpoint-assistant-*`)
-   - Old assistant snapshot is replaced
+   - Creates/updates latest assistant snapshot (`checkpoint-assistant-*`) **only when repo tree changed**
+   - Read-only turns (no file changes) do not create user or assistant checkpoints
+   - Old assistant snapshot is replaced when a new one is created
 4. **Tool/result nodes**
    - No dedicated snapshot
 
@@ -92,6 +93,11 @@ Important:
   - latest assistant-node checkpoint
 - Timeline excludes:
   - `checkpoint-resume-*` (resume is for `/fork` fallback only)
+
+### Clear checkpoints for current session
+
+- `/clear-checkpoint` deletes rewind refs for the active Pi session only
+- Also resets in-memory rewind state/cursor immediately
 
 ---
 
