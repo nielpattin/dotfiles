@@ -37,9 +37,13 @@ Covers:
 
 ## 1) Prerequisites
 
-Install:
-- `git`
-- `chezmoi`
+Install `git` and `chezmoi` with the OS package manager (do **not** manage chezmoi via mise):
+
+- **Windows (winget):**
+  - `winget install --id Git.Git -e`
+  - `winget install --id twpayne.chezmoi -e`
+- **Arch Linux / WSL (pacman):**
+  - `sudo pacman -S --needed git chezmoi`
 
 Age private key file must exist at:
 
@@ -255,6 +259,12 @@ chezmoi diff
 - Never commit `~/.config/chezmoi/key.txt`.
 - Back up age key securely.
 - If key is lost, encrypted repo files cannot be decrypted.
+
+### SSH policy
+
+- `~/.ssh` is intentionally **not** managed by this chezmoi repo.
+- Keep SSH keys/config machine-local.
+- For new machines, migrate SSH keys/config manually (or via your separate secure backup process), then test with `ssh -T git@github.com`.
 
 ---
 

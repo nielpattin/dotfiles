@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 This repo is the chezmoi source for the user’s Windows environment (`~/.local/share/chezmoi`).
-Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), shared skills, and shell/SSH/secrets templates.
+Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), shared skills, and shell/secrets templates.
 
 ## STRUCTURE
 | Path | Purpose |
@@ -19,7 +19,6 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 | `dot_config/opencode/` | largest config surface; custom agents/commands/plugins |
 | `dot_pi/` | maps to `~/.pi` (agent settings/extensions/skills/themes) |
 | `.pi/` | local Pi runtime state in source working tree (not target mapping) |
-| `dot_ssh/` | SSH config material (sensitive) |
 
 ## WHERE TO LOOK
 | Task | Location | Notes |
@@ -43,6 +42,7 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 - Use `chezmoi add <target>` only when importing an already-existing file from `~` into source.
 - Use `chezmoi re-add <target>` only when a managed target in `~` was changed manually and must be reconciled back to source.
 - Naming follows chezmoi mapping (`dot_*` → hidden targets under `$HOME`).
+- SSH material is intentionally unmanaged by chezmoi in this repo; keep `~/.ssh` local per machine.
 - Secrets model:
   - Canonical source file: `dot_config/private_chezmoi/encrypted_secrets.yaml.age`
   - Generated shell secret files are templates; do not modify generated output directly.

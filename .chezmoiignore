@@ -53,4 +53,5 @@ nul
 .config/opencode/plugins/**/dist/**
 .config/opencode/plugins/**/.opencode/**
 
-# SSH is fully managed via encrypted entries (do not ignore)
+# SSH is intentionally unmanaged in this repo (machine-local)
+.ssh/**
