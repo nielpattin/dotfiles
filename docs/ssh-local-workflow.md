@@ -12,16 +12,16 @@ This dotfiles repo does **not** manage `~/.ssh`.
 1. Install OpenSSH client.
 2. Restore/import your SSH private keys from your secure backup process.
 3. Restore/import your SSH config and known_hosts (optional but recommended).
-4. Set strict permissions:
-   - Linux/WSL: `chmod 700 ~/.ssh && chmod 600 ~/.ssh/*`
+4. Set strict permissions on Linux:
+   - `chmod 700 ~/.ssh && chmod 600 ~/.ssh/*`
 5. Verify access:
    - `ssh -T git@github.com`
 
-## WSL local SSH bridge (optional)
+## Local bridge example
 
-If you use SSH to connect into WSL from Windows, keep that key local too:
+If you connect from one local machine environment to another local machine environment, keep those bridge keys local too.
 
-- Windows key example: `~/.ssh/wsl_arch_ssh`
-- WSL authorized key: `~/.ssh/authorized_keys`
+- Example private key: `~/.ssh/local_bridge_key`
+- Example authorized key target: `~/.ssh/authorized_keys`
 
 Do **not** commit either file into this repo.

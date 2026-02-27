@@ -7,7 +7,9 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 ## STRUCTURE
 | Path | Purpose |
 |---|---|
-| `README.md` | Full runbook (bootstrap, sync, secrets, recovery) |
+| `README.md` | Entry point + policy + OS guide links |
+| `README.windows.md` | Windows setup, post-install, daily workflow |
+| `README.linux.md` | Linux setup, post-install, daily workflow |
 | `.chezmoi.toml.tmpl` | age encryption config + key identity path |
 | `.chezmoiexternal.toml` | external git-managed assets (opencode plugin) |
 | `.chezmoiignore` | excludes runtime/build/machine-specific state |
@@ -23,8 +25,9 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 ## WHERE TO LOOK
 | Task | Location | Notes |
 |---|---|---|
-| First-time machine setup | `README.md` | Canonical bootstrap + apply flow |
-| Daily sync/apply workflow | `README.md` | `git pull --ff-only` + `chezmoi apply` |
+| First-time machine setup (Windows) | `README.windows.md` | Canonical bootstrap + post-install flow |
+| First-time machine setup (Linux) | `README.linux.md` | Canonical bootstrap + post-install flow |
+| Daily sync/apply workflow | `README.windows.md`, `README.linux.md` | `git pull --ff-only` + `chezmoi apply` |
 | Encryption/key config | `.chezmoi.toml.tmpl` | age recipient + `~/.config/chezmoi/key.txt` identity |
 | Secret include/exclude policy | `.chezmoiignore` | Runtime/auth/session paths intentionally excluded |
 | External plugin pin/source | `.chezmoiexternal.toml` | `git-repo` source + branch/pull args |
@@ -38,6 +41,7 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 - Temporary external work (downloads/clones/extracts) must happen under `./tmp` only.
 - For `curl`/`wget`, `gh repo clone`, and `uvx github-dlr https://github.com/<user>/<repo>` operations, set destination/workdir to `./tmp`.
 - New tracked config/file: create it directly in source (`dot_*` path) rather than creating it in `~` first.
+- Keep this repo config-focused: avoid adding auto-bootstrap `run_*` scripts unless explicitly requested by the user.
 - Prefer this root `AGENTS.md` for shared rules; add/expand nested `AGENTS.md` only for truly directory-specific constraints.
 - Use `chezmoi add <target>` only when importing an already-existing file from `~` into source.
 - Use `chezmoi re-add <target>` only when a managed target in `~` was changed manually and must be reconciled back to source.
