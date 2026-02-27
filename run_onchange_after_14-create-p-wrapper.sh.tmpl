@@ -1,0 +1,24 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+PI_BIN=""
+for c in pi "$HOME/.local/share/pnpm/pi"; do
+  if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then
+    PI_BIN="$(command -v "$c" 2>/dev/null || printf '%s' "$c")"
+    break
+  fi
+done
+
+if [ -z "$PI_BIN" ]; then
+  echo "warning: pi command not found; skipping p wrapper creation." >&2
+  exit 0
+fi
+
+mkdir -p "$HOME/.local/bin"
+cat >"$HOME/.local/bin/p" <<EOF
+#!/usr/bin/env bash
+exec "$PI_BIN" "\$@"
+EOF
+chmod +x "$HOME/.local/bin/p"
+{{- end }}
