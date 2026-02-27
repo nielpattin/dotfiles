@@ -5,7 +5,7 @@
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
   "defaultThinkingLevel": "medium",
-  "theme": "catppuccin-mocha",
+  "theme": "dark",
   "transport": "sse",
   "packages": [
     "https://github.com/Whamp/pi-read-map",

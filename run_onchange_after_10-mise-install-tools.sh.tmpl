@@ -1,0 +1,39 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+MISE_BIN=""
+if command -v mise >/dev/null 2>&1; then
+  MISE_BIN="$(command -v mise)"
+elif [ -x "$HOME/.local/bin/mise" ]; then
+  MISE_BIN="$HOME/.local/bin/mise"
+fi
+
+if [ -z "$MISE_BIN" ]; then
+  echo "mise not found; expected it at $HOME/.local/bin/mise" >&2
+  exit 1
+fi
+
+# Ensure deterministic path during non-interactive chezmoi script execution
+export PATH="$HOME/.local/bin:$HOME/.local/share/mise/shims:$PATH"
+
+# Trust mise config files so first-run in WSL is non-interactive/seamless
+for cfg in \
+  "${MISE_CONFIG_FILE:-}" \
+  "${XDG_CONFIG_HOME:-}/mise/config.toml" \
+  "$HOME/.config/mise/config.toml"; do
+  [ -n "$cfg" ] || continue
+  [ -f "$cfg" ] || continue
+  "$MISE_BIN" trust -y "$cfg" >/dev/null 2>&1 || true
+  "$MISE_BIN" trust -y --all -C "$(dirname "$cfg")" >/dev/null 2>&1 || true
+done
+
+# Install critical tools first (requested bootstrap order)
+for tool in starship node gh python uv go bun pnpm; do
+  "$MISE_BIN" install "$tool"
+done
+
+# Then install everything declared in ~/.config/mise/config.toml
+"$MISE_BIN" install
+"$MISE_BIN" reshim >/dev/null 2>&1 || true
+{{- end }}

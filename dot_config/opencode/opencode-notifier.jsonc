@@ -25,10 +25,10 @@
     "question": "Session has a question"
   },
   "sounds": {
-    "permission": "C:\\Users\\niel\\.config\\opencode\\assets\\sounds_gow_active_reload.mp3",
-    "complete": "C:\\Users\\niel\\.config\\opencode\\assets\\sounds_gow_active_reload.mp3",
-    "subagent_complete": "C:\\Users\\niel\\.config\\opencode\\assets\\sounds_gow_active_reload.mp3",
-    "error": "C:\\Users\\niel\\.config\\opencode\\assets\\sounds_gow_active_reload.mp3",
-    "question": "C:\\Users\\niel\\.config\\opencode\\assets\\sounds_gow_active_reload.mp3"
+    "permission": "~/.config/opencode/assets/sounds_gow_active_reload.mp3",
+    "complete": "~/.config/opencode/assets/sounds_gow_active_reload.mp3",
+    "subagent_complete": "~/.config/opencode/assets/sounds_gow_active_reload.mp3",
+    "error": "~/.config/opencode/assets/sounds_gow_active_reload.mp3",
+    "question": "~/.config/opencode/assets/sounds_gow_active_reload.mp3"
   }
 }

@@ -1,0 +1,22 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+ensure_line() {
+  local file="$1"
+  local line="$2"
+  mkdir -p "$(dirname "$file")"
+  touch "$file"
+  grep -Fqx "$line" "$file" || printf '\n%s\n' "$line" >>"$file"
+}
+
+# Ensure mise binary is reachable in future shells
+PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+
+# Ensure installed tools (via mise shims) are available in bash sessions
+ACTIVATE_LINE='eval "$("$HOME/.local/bin/mise" activate bash)"'
+
+ensure_line "$HOME/.profile" "$PATH_LINE"
+ensure_line "$HOME/.bashrc" "$PATH_LINE"
+ensure_line "$HOME/.bashrc" "$ACTIVATE_LINE"
+{{- end }}

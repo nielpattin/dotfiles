@@ -1,8 +1,8 @@
 [tools]
 "aqua:jesseduffield/lazygit" = "latest"
 bun = "latest"
-chezmoi = "2.69.4"
 gh = "latest"
+starship = "latest"
 "github:trasta298/keifu" = "latest"
 go = "latest"
 mitmproxy = "latest"
