@@ -1,17 +1,6 @@
 # ==============================================================================
 # OPTIMIZED PowerShell Profile (Stable)
-# Techniques: Caching (Starship/Zoxide), Standard mise
-# ==============================================================================
-$Script:ProfileTimings = [System.Collections.ArrayList]::new()
-$Script:ProfileStart = [System.Diagnostics.Stopwatch]::StartNew()
-
-function Measure-ProfileSection {
-    param([string]$Name, [ScriptBlock]$Script)
-    $sw = [System.Diagnostics.Stopwatch]::StartNew()
-    try { & $Script } catch { Write-Warning "Error in $Name`: $_" }
-    $sw.Stop()
-    $null = $Script:ProfileTimings.Add([PSCustomObject]@{ Section = $Name; TimeMs = $sw.ElapsedMilliseconds })
-}
+# ============================================================================== 
 
 # ==============================================================================
 # Environment Setup (instant)
@@ -19,96 +8,17 @@ function Measure-ProfileSection {
 $env:TERM = "xterm-256color"
 
 # ==============================================================================
-# OPTIMIZATION 1: Starship - Fully Static Cached Initialization
-# Pre-computes continuation prompt and session key for instant loading
+# Starship
 # ==============================================================================
-$Script:StarshipCacheFile = "$HOME\.cache\starship-init.ps1"
-$Script:StarshipCacheMaxAge = [TimeSpan]::FromDays(1)
-
-function Invoke-Starship-PreCommand {
-    $loc = $executionContext.SessionState.Path.CurrentLocation
-    if ($loc.Provider.Name -eq "FileSystem") {
-        Write-Host -NoNewline "`e]9;9;$($loc.ProviderPath)`e\"
-    }
-}
-
-function Build-StarshipCache {
-    # Get the full init script
-    $initScript = & starship init powershell --print-full-init | Out-String
-    
-    # Use an ASCII continuation prompt to avoid Unicode mojibake in cached init
-    # and keep multiline commands visually clean.
-    $continuationPrompt = '>> '
-
-    # Escape the continuation prompt for embedding in PowerShell string
-    $escapedPrompt = $continuationPrompt -replace "'", "''"
-    
-    # Replace the dynamic Invoke-Native call with static continuation prompt
-    # This regex matches the Set-PSReadLineOption -ContinuationPrompt block
-    $pattern = 'Set-PSReadLineOption -ContinuationPrompt \(\s*Invoke-Native -Executable .+?(?=\s*\)\s*\))\s*\)\s*\)'
-    $replacement = "Set-PSReadLineOption -ContinuationPrompt '$escapedPrompt'"
-    $initScript = [regex]::Replace($initScript, $pattern, $replacement, [System.Text.RegularExpressions.RegexOptions]::Singleline)
-    
-    return $initScript
-}
-
-Measure-ProfileSection "Starship (cached)" {
-    $useCache = $false
-    if (Test-Path $Script:StarshipCacheFile) {
-        $cacheItem = Get-Item $Script:StarshipCacheFile
-        $cacheAge = (Get-Date) - $cacheItem.LastWriteTime
-
-        # Rebuild cache when profile changes so prompt fixes apply immediately.
-        $profileIsNewerThanCache = $false
-        if (Test-Path $PROFILE) {
-            $profileIsNewerThanCache = (Get-Item $PROFILE).LastWriteTime -gt $cacheItem.LastWriteTime
-        }
-
-        if ($cacheAge -lt $Script:StarshipCacheMaxAge -and -not $profileIsNewerThanCache) {
-            $useCache = $true
-        }
-    }
-
-    if ($useCache) {
-        # Fast path: source fully static cached init script
-        . $Script:StarshipCacheFile
-    } else {
-        # Slow path: generate and cache with pre-computed values
-        $null = New-Item -Path (Split-Path $Script:StarshipCacheFile) -ItemType Directory -Force -ErrorAction SilentlyContinue
-        $initScript = Build-StarshipCache
-        $initScript | Out-File -FilePath $Script:StarshipCacheFile -Encoding UTF8 -Force
-        Invoke-Expression $initScript
-    }
-}
-
-# Helper to refresh starship cache manually
-function Update-StarshipCache {
-    Write-Host "Refreshing Starship cache..." -ForegroundColor Cyan
-    $initScript = Build-StarshipCache
-    $initScript | Out-File -FilePath $Script:StarshipCacheFile -Encoding UTF8 -Force
-    Invoke-Expression $initScript
-    Write-Host "Starship cache updated!" -ForegroundColor Green
+if (Get-Command starship -ErrorAction SilentlyContinue) {
+    Invoke-Expression (&starship init powershell)
 }
 
 # ==============================================================================
 # Zoxide
 # ==============================================================================
-Measure-ProfileSection "Zoxide" {
+if (Get-Command zoxide -ErrorAction SilentlyContinue) {
     Invoke-Expression (& { (zoxide init powershell | Out-String) })
-}
-
-# ==============================================================================
-# GitHub CLI (gh) - Tab Completion
-# ==============================================================================
-Measure-ProfileSection "gh CLI Completion" {
-    Invoke-Expression -Command $(gh completion -s powershell | Out-String)
-}
-
-# ==============================================================================
-# mise - Standard Activation (Synchronous/Safe)
-# ==============================================================================
-Measure-ProfileSection "mise" {
-    mise activate pwsh | Out-String | Invoke-Expression
 }
 
 # ==============================================================================
@@ -203,62 +113,60 @@ function which($name) { & where.exe $name }
 # ==============================================================================
 # PSReadLine (fast)
 # ==============================================================================
-Measure-ProfileSection "PSReadLine" {
-    $PSReadLineOptions = @{
-        EditMode = 'Windows'
-        HistoryNoDuplicates = $true
-        HistorySearchCursorMovesToEnd = $true
-        Colors = @{
-            Command = '#87CEEB'; Parameter = '#98FB98'; Operator = '#FFB6C1'
-            Variable = '#DDA0DD'; String = '#FFDAB9'; Number = '#B0E0E6'
-            Type = '#F0E68C'; Comment = '#D3D3D3'; Keyword = '#8367c7'; Error = '#FF6347'
-        }
-        PredictionSource = 'History'
-        PredictionViewStyle = 'ListView'
-        BellStyle = 'None'
+$PSReadLineOptions = @{
+    EditMode = 'Windows'
+    HistoryNoDuplicates = $true
+    HistorySearchCursorMovesToEnd = $true
+    Colors = @{
+        Command = '#87CEEB'; Parameter = '#98FB98'; Operator = '#FFB6C1'
+        Variable = '#DDA0DD'; String = '#FFDAB9'; Number = '#B0E0E6'
+        Type = '#F0E68C'; Comment = '#D3D3D3'; Keyword = '#8367c7'; Error = '#FF6347'
     }
-    if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {
-        Set-PSReadLineOption @PSReadLineOptions
-        Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
-        Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
-        # Custom Tab handler: Complete + convert backslashes to forward slashes immediately
-        Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
-            # Use Complete (non-menu) for simpler flow, then replace slashes
-            [Microsoft.PowerShell.PSConsoleReadLine]::Complete()
-            
-            # Get the line after completion and fix slashes
-            $line = $null
-            $cursor = $null
-            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-            
-            if ($line -match '\\') {
-                $fixedLine = $line -replace '\\', '/'
-                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $fixedLine)
-                [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
-            }
+    PredictionSource = 'History'
+    PredictionViewStyle = 'ListView'
+    BellStyle = 'None'
+}
+if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {
+    Set-PSReadLineOption @PSReadLineOptions
+    Set-PSReadLineKeyHandler -Key UpArrow -Function HistorySearchBackward
+    Set-PSReadLineKeyHandler -Key DownArrow -Function HistorySearchForward
+    # Custom Tab handler: Complete + convert backslashes to forward slashes immediately
+    Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
+        # Use Complete (non-menu) for simpler flow, then replace slashes
+        [Microsoft.PowerShell.PSConsoleReadLine]::Complete()
+
+        # Get the line after completion and fix slashes
+        $line = $null
+        $cursor = $null
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+
+        if ($line -match '\\') {
+            $fixedLine = $line -replace '\\', '/'
+            [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $fixedLine)
+            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
         }
-        # Shift+Tab for previous completion with forward slashes
-        Set-PSReadLineKeyHandler -Key Shift+Tab -ScriptBlock {
-            [Microsoft.PowerShell.PSConsoleReadLine]::Complete()
-            
-            $line = $null
-            $cursor = $null
-            [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
-            
-            if ($line -match '\\') {
-                $fixedLine = $line -replace '\\', '/'
-                [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $fixedLine)
-                [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
-            }
+    }
+    # Shift+Tab for previous completion with forward slashes
+    Set-PSReadLineKeyHandler -Key Shift+Tab -ScriptBlock {
+        [Microsoft.PowerShell.PSConsoleReadLine]::Complete()
+
+        $line = $null
+        $cursor = $null
+        [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)
+
+        if ($line -match '\\') {
+            $fixedLine = $line -replace '\\', '/'
+            [Microsoft.PowerShell.PSConsoleReadLine]::Replace(0, $line.Length, $fixedLine)
+            [Microsoft.PowerShell.PSConsoleReadLine]::SetCursorPosition($cursor)
         }
-        Set-PSReadLineKeyHandler -Chord 'Ctrl+d' -Function DeleteChar
     }
-    Set-PSReadLineOption -AddToHistoryHandler {
-        param($line)
-        $sensitive = @('password', 'secret', 'token', 'apikey', 'connectionstring')
-        $hasSensitive = $sensitive | Where-Object { $line -match $_ }
-        return ($null -eq $hasSensitive)
-    }
+    Set-PSReadLineKeyHandler -Chord 'Ctrl+d' -Function DeleteChar
+}
+Set-PSReadLineOption -AddToHistoryHandler {
+    param($line)
+    $sensitive = @('password', 'secret', 'token', 'apikey', 'connectionstring')
+    $hasSensitive = $sensitive | Where-Object { $line -match $_ }
+    return ($null -eq $hasSensitive)
 }
 
 # ==============================================================================
@@ -330,29 +238,3 @@ function oc-dev {
 #     Write-Host "OpenCode Proxy Disabled" -ForegroundColor Yellow
 # }
 
-# ==============================================================================
-# Cache Management Utilities
-# ==============================================================================
-function Clear-ProfileCache {
-    Remove-Item $Script:StarshipCacheFile -ErrorAction SilentlyContinue
-    Write-Host "Profile caches cleared. Restart PowerShell to regenerate." -ForegroundColor Yellow
-}
-
-function Update-ProfileCache {
-    Update-StarshipCache
-    Write-Host "Starship cache updated!" -ForegroundColor Cyan
-}
-
-# ==============================================================================
-# Profile Timing Report
-# ==============================================================================
-$Script:ProfileStart.Stop()
-
-if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected) {
-    Write-Host "Profile loaded in $($Script:ProfileStart.ElapsedMilliseconds)ms" -ForegroundColor Cyan
-    Write-Host "Section breakdown:" -ForegroundColor White
-    $Script:ProfileTimings | Sort-Object TimeMs -Descending | ForEach-Object {
-        $color = if ($_.TimeMs -gt 300) { "Red" } elseif ($_.TimeMs -gt 100) { "Yellow" } else { "Green" }
-        Write-Host ("  {0,-25} {1,6}ms" -f $_.Section, $_.TimeMs) -ForegroundColor $color
-    }
-}
