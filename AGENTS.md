@@ -38,6 +38,8 @@ Primary payload: Pi config (`~/.pi`), opencode config (`~/.config/opencode`), sh
 ## CONVENTIONS (PROJECT-SPECIFIC)
 - Source of truth is this chezmoi source repo; home directory is generated target.
 - Default flow: modify files in this repo, then run `chezmoi apply` to sync to `$HOME`.
+- Never use force flags/options with chezmoi in this repo.
+- If `chezmoi apply` requires force/conflict bypass, stop and ask the user to resolve the conflict.
 - Temporary external work (downloads/clones/extracts) must happen under `./tmp` only.
 - For `curl`/`wget`, `gh repo clone`, and `uvx github-dlr https://github.com/<user>/<repo>` operations, set destination/workdir to `./tmp`.
 - New tracked config/file: create it directly in source (`dot_*` path) rather than creating it in `~` first.
