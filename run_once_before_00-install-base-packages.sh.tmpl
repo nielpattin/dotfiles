@@ -1,0 +1,41 @@
+{{ if eq .chezmoi.os "linux" -}}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Arch/WSL bootstrap: ensure base packages for this dotfiles workflow.
+# - fish: preferred interactive shell
+# - curl: required by mise bootstrap script
+if ! command -v pacman >/dev/null 2>&1; then
+  exit 0
+fi
+
+missing=()
+command -v fish >/dev/null 2>&1 || missing+=(fish)
+command -v curl >/dev/null 2>&1 || missing+=(curl)
+
+if [ ${#missing[@]} -eq 0 ]; then
+  exit 0
+fi
+
+if [ "$(id -u)" -eq 0 ]; then
+  pacman -S --needed --noconfirm "${missing[@]}"
+  exit 0
+fi
+
+if command -v sudo >/dev/null 2>&1; then
+  # Interactive apply: allow sudo to prompt.
+  if [ -t 0 ]; then
+    sudo pacman -S --needed --noconfirm "${missing[@]}"
+    exit 0
+  fi
+
+  # Non-interactive apply: only proceed with passwordless sudo.
+  if sudo -n true >/dev/null 2>&1; then
+    sudo -n pacman -S --needed --noconfirm "${missing[@]}"
+    exit 0
+  fi
+fi
+
+echo "warning: cannot auto-install ${missing[*]} (sudo password prompt unavailable)." >&2
+echo "run once manually: sudo pacman -S --needed ${missing[*]}" >&2
+{{- end }}
