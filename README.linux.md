@@ -10,6 +10,7 @@ Install at minimum:
 - `chezmoi`
 - `curl`
 - `fish`
+- `eza`
 - `make`
 - `gcc`
 
@@ -17,11 +18,11 @@ Examples:
 
 ```bash
 # Arch
-sudo pacman -S --needed git chezmoi curl fish make gcc
+sudo pacman -S --needed git chezmoi curl fish eza make gcc
 
 # Debian/Ubuntu
 sudo apt update
-sudo apt install -y git chezmoi curl fish build-essential
+sudo apt install -y git chezmoi curl fish eza build-essential
 ```
 
 Required secret key file:
