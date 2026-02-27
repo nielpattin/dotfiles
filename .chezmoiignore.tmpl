@@ -55,3 +55,9 @@ nul
 
 # SSH is intentionally unmanaged in this repo (machine-local)
 .ssh/**
+
+{{- if ne .chezmoi.os "windows" }}
+# Windows-only targets: do not manage on non-Windows
+.wslconfig
+Documents/PowerShell/**
+{{- end }}
