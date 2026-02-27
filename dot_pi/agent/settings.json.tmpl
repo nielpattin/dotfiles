@@ -1,5 +1,0 @@
-{{- if eq .chezmoi.os "windows" -}}
-{{ include "dot_pi/agent/settings.windows.json" }}
-{{- else -}}
-{{ include "dot_pi/agent/settings.linux.json" }}
-{{- end -}}
