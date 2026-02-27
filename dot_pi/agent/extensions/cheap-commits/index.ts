@@ -43,6 +43,8 @@ Only stop for human input if there is a blocker. Otherwise generate and stage co
 
 const DEFAULT_SKILL = "writing-git-commits";
 const DEFAULT_AGENT_CANDIDATES = [
+  // Prefer the dedicated commit agent first for reliability
+  "commit-writer",
   "general",
   "worker",
   "default",
@@ -827,27 +829,7 @@ async function generateCommitCommand(
   ctx: ExtensionContext,
   pi: ExtensionAPI,
   config: GenerateCommitMessageConfig,
-  explicitModel?: string,
 ): Promise<void> {
-  const maxCost = config.maxOutputCost ?? DEFAULT_MAX_OUTPUT_COST;
-
-  // Determine model selection
-  let selection: ModelSelection;
-
-  // Priority: explicit model > configured model > auto-select
-  if (explicitModel) {
-    const cost = await getModelCost(ctx, explicitModel);
-    selection = { model: explicitModel, source: "config", cost };
-  } else {
-    const configuredMode = normalizeMode(config.mode);
-    if (configuredMode) {
-      const cost = await getModelCost(ctx, configuredMode);
-      selection = { model: configuredMode, source: "config", cost };
-    } else {
-      selection = await pickCheapestModel(ctx, maxCost);
-    }
-  }
-
   const basePrompt = buildPrompt(config, args);
   const repositoryGuard = [
     `Operate only in this repository: ${ctx.cwd}`,
@@ -859,21 +841,16 @@ async function generateCommitCommand(
   const payload = {
     agent,
     task: prompt,
-    model: selection.model,
     skill: DEFAULT_SKILL,
     clarify: false,
     agentScope: "both",
     cwd: ctx.cwd,
   };
 
-  // Provide user feedback
+  // Always use the selected subagent's default model/settings
   if (ctx.hasUI) {
-    const sourceLabel =
-      selection.source === "config" ? "configured" : "auto-selected (cheapest)";
-    const costLabel = formatCost(selection.cost);
-
     ctx.ui.notify(
-      `Commit: ${selection.model} [${sourceLabel}] — ${costLabel}`,
+      `Commit: using agent defaults (${agent})`,
       "info",
     );
   }

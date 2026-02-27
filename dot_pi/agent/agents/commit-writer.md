@@ -2,7 +2,7 @@
 name: commit-writer
 description: Focused subagent for writing and staging git commits
 tools: read, bash
-model: openai-codex/gpt-5.1-codex-mini
+model: openai-codex/gpt-5.3-codex
 skills: writing-git-commits
 defaultProgress: true
 ---

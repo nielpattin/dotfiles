@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ReadonlyFooterDataProvider, Theme } from "@mariozechner/pi-coding-agent";
-import { visibleWidth, type EditorTheme } from "@mariozechner/pi-tui";
+import { truncateToWidth, visibleWidth, type EditorTheme } from "@mariozechner/pi-tui";
 
 import type { ColorScheme, SegmentContext, StatusLinePreset, StatusLineSegmentId } from "./types.js";
 import { getPreset, PRESETS } from "./presets.js";
@@ -323,12 +323,12 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             return originalRender(width);
           }
 
-          const border = (s: string) => editor.borderColor(s);
+          const border = (s: string) => ctx.ui.theme.fg("borderAccent", s);
           const prompt = "\x1b[38;2;200;200;200m>\x1b[0m";
 
           const promptPrefix = ` ${prompt} `;
           const contPrefix = "   ";
-          const contentWidth = Math.max(1, width - 3);
+          const contentWidth = Math.max(1, width - 5);
           const lines = originalRender(contentWidth);
 
           if (lines.length === 0 || !currentCtx) return lines;
@@ -359,18 +359,27 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             result.push(ctx.ui.theme.fg("dim", `${sessionPrefix}${sessionText}`));
           }
 
-          result.push(" " + border("─".repeat(width - 2)));
+          const makeBodyRow = (inner: string) => {
+            const innerWidth = Math.max(1, width - 2);
+            const clipped = truncateToWidth(inner, innerWidth, "");
+            const pad = " ".repeat(Math.max(0, innerWidth - visibleWidth(clipped)));
+            return border("│") + clipped + pad + border("│");
+          };
+
+          const userLabel = ` ${ctx.ui.theme.bold("User")} `;
+          const topFill = Math.max(1, width - 2 - visibleWidth(userLabel));
+          result.push(border("┌") + ctx.ui.theme.fg("accent", userLabel) + border("─".repeat(topFill) + "┐"));
 
           for (let i = 1; i < bottomBorderIndex; i++) {
             const prefix = i === 1 ? promptPrefix : contPrefix;
-            result.push(`${prefix}${lines[i] || ""}`);
+            result.push(makeBodyRow(`${prefix}${lines[i] || ""}`));
           }
 
           if (bottomBorderIndex === 1) {
-            result.push(`${promptPrefix}${" ".repeat(contentWidth)}`);
+            result.push(makeBodyRow(`${promptPrefix}${" ".repeat(contentWidth)}`));
           }
 
-          result.push(" " + border("─".repeat(width - 2)));
+          result.push(border("└" + "─".repeat(Math.max(1, width - 2)) + "┘"));
 
           for (let i = bottomBorderIndex + 1; i < lines.length; i++) {
             result.push(lines[i] || "");

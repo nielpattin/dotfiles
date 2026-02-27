@@ -4,7 +4,7 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
-  "defaultThinkingLevel": "high",
+  "defaultThinkingLevel": "medium",
   "theme": "catppuccin-mocha",
   "transport": "sse",
   "packages": [
@@ -37,14 +37,14 @@
         "-index.ts"
       ]
     },
-    "git:github.com/nicobailon/pi-subagents",
     {
       "source": "git:github.com/nielpattin/pi-sub",
       "extensions": [
         "+packages\\sub-core\\index.ts",
         "+packages\\sub-bar\\index.ts"
       ]
-    }
+    },
+    "git:github.com/nicobailon/pi-subagents"
   ],
   "skills": [
     "-..\\..\\.agents\\skills\\prd\\SKILL.md",
@@ -64,7 +64,8 @@
     "-extensions\\modes\\index.ts",
     "-extensions\\image-paste-ui.ts",
     "-extensions\\working-vibes\\index.ts",
-    "+extensions\\figma-start.ts"
+    "+extensions\\figma-start.ts",
+    "+extensions\\powerline-footer\\index.ts"
   ],
   "workingVibeModel": "openai-codex/gpt-5.3-codex",
   "workingVibe": "game-dev",
@@ -94,5 +95,7 @@
     "-themes\\rose-pine.json",
     "-themes\\synthwave.json",
     "+themes\\tokyo-night.json"
-  ]
+  ],
+  "followUpMode": "all",
+  "steeringMode": "all"
 }
