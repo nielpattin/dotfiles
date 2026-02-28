@@ -254,21 +254,20 @@ const costSegment: StatusLineSegment = {
 const contextPctSegment: StatusLineSegment = {
   id: "context_pct",
   render(ctx) {
-    const icons = getIcons();
     const pct = ctx.contextPercent;
+    const used = ctx.contextUsed;
     const window = ctx.contextWindow;
 
-    const autoIcon = ctx.autoCompactEnabled && icons.auto ? ` ${icons.auto}` : "";
-    const text = `${pct.toFixed(1)}%/${formatTokens(window)}${autoIcon}`;
+    const text = `${formatTokens(used)}/${formatTokens(window)} (${pct.toFixed(1)}%)`;
 
-    // Icon outside color, text inside - use semantic colors for thresholds
+    // No context icon; only colored text by threshold
     let content: string;
     if (pct > 90) {
-      content = withIcon(icons.context, color(ctx, "contextError", text));
+      content = color(ctx, "contextError", text);
     } else if (pct > 70) {
-      content = withIcon(icons.context, color(ctx, "contextWarn", text));
+      content = color(ctx, "contextWarn", text);
     } else {
-      content = withIcon(icons.context, color(ctx, "context", text));
+      content = color(ctx, "context", text);
     }
 
     return { content, visible: true };

@@ -26,8 +26,8 @@ const NERD_COLORS: ColorScheme = {
 
 export const PRESETS: Record<StatusLinePreset, PresetDef> = {
   default: {
-    leftSegments: ["pi", "model", "thinking", "path", "git", "context_pct", "cache_read", "cost"],
-    rightSegments: [],
+    leftSegments: ["pi", "model", "thinking", "cache_read", "cost"],
+    rightSegments: ["path", "git", "context_pct"],
     secondarySegments: ["extension_statuses"],
     separator: "powerline-thin",
     colors: DEFAULT_COLORS,

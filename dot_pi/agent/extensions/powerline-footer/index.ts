@@ -27,14 +27,23 @@ function renderSegmentWithWidth(
   return { content: rendered.content, width: visibleWidth(rendered.content), visible: true };
 }
 
+function joinParts(parts: string[], sep: string): string {
+  return parts.length > 0 ? parts.join(` ${sep} `) : "";
+}
+
 function buildContentFromParts(
   parts: string[],
   presetDef: ReturnType<typeof getPreset>,
 ): string {
   if (parts.length === 0) return "";
   const separatorDef = getSeparator(presetDef.separator);
-  const sep = separatorDef.left;
-  return ` ${parts.join(` ${sep} `)} `;
+  return ` ${joinParts(parts, separatorDef.left)} `;
+}
+
+function groupWidth(parts: { width: number }[], sepWidth: number): number {
+  if (parts.length === 0) return 0;
+  const partsWidth = parts.reduce((sum, p) => sum + p.width, 0);
+  return partsWidth + sepWidth * (parts.length - 1);
 }
 
 function computeResponsiveLayout(
@@ -43,44 +52,81 @@ function computeResponsiveLayout(
   availableWidth: number,
 ): { topContent: string; secondaryContent: string } {
   const separatorDef = getSeparator(presetDef.separator);
-  const sepWidth = visibleWidth(separatorDef.left) + 2;
+  const leftSepWidth = visibleWidth(separatorDef.left) + 2;
 
-  const primaryIds = [...presetDef.leftSegments, ...presetDef.rightSegments];
-  const secondaryIds = presetDef.secondarySegments ?? [];
-  const allSegmentIds = [...primaryIds, ...secondaryIds];
+  const leftRendered = presetDef.leftSegments
+    .map((segId) => ({ ...renderSegmentWithWidth(segId, ctx), segId }))
+    .filter((seg) => seg.visible);
+  const rightRendered = presetDef.rightSegments
+    .map((segId) => ({ ...renderSegmentWithWidth(segId, ctx), segId }))
+    .filter((seg) => seg.visible);
+  const secondaryRendered = (presetDef.secondarySegments ?? [])
+    .map((segId) => ({ ...renderSegmentWithWidth(segId, ctx), segId }))
+    .filter((seg) => seg.visible);
 
-  const renderedSegments: { content: string; width: number }[] = [];
-  for (const segId of allSegmentIds) {
-    const { content, width, visible } = renderSegmentWithWidth(segId, ctx);
-    if (visible) renderedSegments.push({ content, width });
+  const leftTop = [...leftRendered];
+  const rightTop = [...rightRendered];
+  const topInnerWidth = Math.max(0, availableWidth - 2);
+
+  const getTopWidth = () => {
+    const leftWidth = groupWidth(leftTop, leftSepWidth);
+    const rightWidth = groupWidth(rightTop, leftSepWidth);
+    const betweenGroups = leftTop.length > 0 && rightTop.length > 0 ? 1 : 0;
+    return leftWidth + rightWidth + betweenGroups;
+  };
+
+  while (getTopWidth() > topInnerWidth) {
+    if (leftTop.length > 0) {
+      leftTop.pop();
+      continue;
+    }
+    if (rightTop.length > 0) {
+      rightTop.shift();
+      continue;
+    }
+    break;
   }
 
-  if (renderedSegments.length === 0) {
-    return { topContent: "", secondaryContent: "" };
-  }
+  const includedSegIds = new Set<StatusLineSegmentId>([
+    ...leftTop.map((seg) => seg.segId),
+    ...rightTop.map((seg) => seg.segId),
+  ]);
 
-  const baseOverhead = 2;
-  let currentWidth = baseOverhead;
-  const topSegments: string[] = [];
-  const overflowSegments: { content: string; width: number }[] = [];
-  let overflow = false;
+  const overflowPrimary = [...leftRendered, ...rightRendered].filter(
+    (seg) => !includedSegIds.has(seg.segId),
+  );
 
-  for (const seg of renderedSegments) {
-    const neededWidth = seg.width + (topSegments.length > 0 ? sepWidth : 0);
-    if (!overflow && currentWidth + neededWidth <= availableWidth) {
-      topSegments.push(seg.content);
-      currentWidth += neededWidth;
+  const leftStr = joinParts(
+    leftTop.map((seg) => seg.content),
+    separatorDef.left,
+  );
+  const rightStr = joinParts(
+    rightTop.map((seg) => seg.content),
+    separatorDef.right,
+  );
+
+  let topContent = "";
+  if (leftStr || rightStr) {
+    const leftWidth = visibleWidth(leftStr);
+    const rightWidth = visibleWidth(rightStr);
+    const betweenGroups = leftStr && rightStr ? 1 : 0;
+    const paddingWidth = Math.max(0, topInnerWidth - leftWidth - rightWidth - betweenGroups);
+
+    if (leftStr && rightStr) {
+      topContent = ` ${leftStr}${" ".repeat(paddingWidth + 1)}${rightStr} `;
+    } else if (leftStr) {
+      topContent = ` ${leftStr} `;
     } else {
-      overflow = true;
-      overflowSegments.push(seg);
+      topContent = ` ${rightStr} `;
     }
   }
 
-  let secondaryWidth = baseOverhead;
+  const secondaryCandidates = [...overflowPrimary, ...secondaryRendered];
   const secondarySegments: string[] = [];
+  let secondaryWidth = 2;
 
-  for (const seg of overflowSegments) {
-    const neededWidth = seg.width + (secondarySegments.length > 0 ? sepWidth : 0);
+  for (const seg of secondaryCandidates) {
+    const neededWidth = seg.width + (secondarySegments.length > 0 ? leftSepWidth : 0);
     if (secondaryWidth + neededWidth <= availableWidth) {
       secondarySegments.push(seg.content);
       secondaryWidth += neededWidth;
@@ -90,7 +136,7 @@ function computeResponsiveLayout(
   }
 
   return {
-    topContent: buildContentFromParts(topSegments, presetDef),
+    topContent,
     secondaryContent: buildContentFromParts(secondarySegments, presetDef),
   };
 }
@@ -269,8 +315,9 @@ export default function powerlineFooter(pi: ExtensionAPI) {
       sessionName: ctx.sessionManager?.getSessionName?.(),
       usageStats: { input, output, cacheRead, cacheWrite, cost },
       contextPercent,
+      contextUsed: contextTokens,
       contextWindow,
-      autoCompactEnabled: ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? true,
+      autoCompactEnabled: ctx.settingsManager?.getCompactionSettings?.()?.enabled ?? false,
       usingSubscription,
       sessionStartTime,
       git,
@@ -348,16 +395,6 @@ export default function powerlineFooter(pi: ExtensionAPI) {
 
           const sessionNameRaw = currentCtx.sessionManager?.getSessionName?.();
           const sessionName = typeof sessionNameRaw === "string" ? sessionNameRaw.trim() : "";
-          if (sessionName) {
-            const sessionPrefix = " ↳ ";
-            const maxSessionWidth = Math.max(1, width - 2);
-            const maxNameWidth = Math.max(1, maxSessionWidth - visibleWidth(sessionPrefix));
-            const sessionText =
-              visibleWidth(sessionName) > maxNameWidth
-                ? `${sessionName.slice(0, Math.max(0, maxNameWidth - 1))}…`
-                : sessionName;
-            result.push(ctx.ui.theme.fg("dim", `${sessionPrefix}${sessionText}`));
-          }
 
           const makeBodyRow = (inner: string) => {
             const innerWidth = Math.max(1, width - 2);
@@ -366,9 +403,16 @@ export default function powerlineFooter(pi: ExtensionAPI) {
             return border("│") + clipped + pad + border("│");
           };
 
-          const userLabel = ` ${ctx.ui.theme.bold("User")} `;
-          const topFill = Math.max(1, width - 2 - visibleWidth(userLabel));
-          result.push(border("┌") + ctx.ui.theme.fg("accent", userLabel) + border("─".repeat(topFill) + "┐"));
+          let headerLabel = "";
+          if (sessionName) {
+            const maxSessionWidth = Math.max(0, width - 4);
+            if (maxSessionWidth > 0) {
+              const sessionText = truncateToWidth(sessionName, maxSessionWidth, "…");
+              headerLabel = ` ${ctx.ui.theme.fg("dim", sessionText)} `;
+            }
+          }
+          const topFill = Math.max(1, width - 2 - visibleWidth(headerLabel));
+          result.push(border("┌") + headerLabel + border("─".repeat(topFill) + "┐"));
 
           for (let i = 1; i < bottomBorderIndex; i++) {
             const prefix = i === 1 ? promptPrefix : contPrefix;
