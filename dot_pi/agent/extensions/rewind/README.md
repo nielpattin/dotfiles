@@ -1,8 +1,10 @@
-# Node Restore Extension
+# Rewind Extension
+
+# NOT WORKING YET - IN DEVELOPMENT
 
 Restore files as you move through Pi conversation history.
 
-This extension adds file snapshots so `/tree`, `/fork`, `/undo`, `/redo`, and `/checkpoint-list` can restore code to specific points in the session.
+This extension adds file snapshots so `/tree`, `/undo`, `/redo`, and `/checkpoint-list` can restore code to specific points in the current session.
 
 ## Requirements
 
@@ -32,7 +34,7 @@ This extension adds file snapshots so `/tree`, `/fork`, `/undo`, `/redo`, and `/
 
 1. Open Pi in a Git repo.
 2. Ask Pi to edit files.
-3. Use `/tree` or `/fork` and pick a restore option.
+3. Use `/tree` and pick a restore option when needed.
 4. Use `/undo`, `/redo`, or `/checkpoint-list` to move across checkpoint history.
 
 ---
@@ -43,15 +45,13 @@ Snapshots are stored as git refs under `refs/pi-checkpoints/`.
 
 ### Snapshot rules
 
-1. **Session start**
-   - Creates `checkpoint-resume-*` (fallback restore point)
-2. **Each user turn**
+1. **Each user turn**
    - Creates a user-node snapshot (`checkpoint-*`) **only when repo tree changed**
-3. **Assistant completion**
+2. **Assistant completion**
    - Creates an assistant-node snapshot (`checkpoint-assistant-*`) **only when repo tree changed**
    - Keeps only the newest assistant snapshot for the session
    - Read-only turns (no file changes) do not create user or assistant checkpoints
-4. **Tool/result nodes**
+3. **Tool/result nodes**
    - No dedicated snapshot
 
 ### Tree checkpoint markers
@@ -75,16 +75,6 @@ If selected node has a snapshot, menu is:
 
 If selected node has no snapshot, no restore menu is shown.
 
-### `/fork`
-
-Primary options:
-
-- `Conversation only (keep current files)`
-- `Restore files + conversation to selected node`
-- `Restore files only to selected node (keep conversation)`
-
-If selected node has no snapshot, `/fork` falls back to session start (`checkpoint-resume-*`).
-
 ---
 
 ## Undo / Redo
@@ -98,8 +88,6 @@ Important:
 - Timeline includes:
   - user-node checkpoints
   - latest assistant-node checkpoint
-- Timeline excludes:
-  - `checkpoint-resume-*` (resume is for `/fork` fallback only)
 
 ### Checkpoint picker
 
@@ -125,6 +113,16 @@ If you want untracked cleanup:
 ```bash
 git clean -fd
 ```
+
+---
+
+## Test script (single Bun test file)
+
+```bash
+cd ~/.local/share/chezmoi/dot_pi/agent
+bun test extensions/rewind/rewind.test.js
+```
+
 
 ---
 

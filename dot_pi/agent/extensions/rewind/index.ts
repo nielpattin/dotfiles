@@ -1,5 +1,5 @@
 /**
- * Node restore extension - git-based file restoration for Pi tree/fork navigation.
+ * Rewind extension - git-based file restoration for current-session history and tree navigation.
  */
 
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@mariozechner/pi-coding-agent";
@@ -64,7 +64,6 @@ function formatCheckpointTime(timestamp: number): string {
 export default function (pi: ExtensionAPI) {
   // Snapshot per entry ID (user + assistant nodes that have checkpoints)
   const checkpoints = new Map<string, string>();
-  let resumeCheckpoint: string | null = null;
   let repoRoot: string | null = null;
   let isGitRepo = false;
   let sessionId: string | null = null;
@@ -225,7 +224,6 @@ export default function (pi: ExtensionAPI) {
    */
   function resetState() {
     checkpoints.clear();
-    resumeCheckpoint = null;
     repoRoot = null;
     isGitRepo = false;
     sessionId = null;
@@ -312,6 +310,17 @@ export default function (pi: ExtensionAPI) {
     } catch {
       return null;
     }
+  }
+
+  async function ensureGitRepo(exec: ExecFn): Promise<boolean> {
+    if (isGitRepo) return true;
+    try {
+      const result = await exec("git", ["rev-parse", "--is-inside-work-tree"]);
+      isGitRepo = result.stdout.trim() === "true";
+    } catch {
+      isGitRepo = false;
+    }
+    return isGitRepo;
   }
 
   async function getRepoRoot(exec: ExecFn): Promise<string> {
@@ -561,6 +570,66 @@ export default function (pi: ExtensionAPI) {
     return null;
   }
 
+  /**
+   * Find assistant message in the current branch.
+   * If targetTimestamp is provided, prefer exact timestamp match for the current turn.
+   */
+  function findAssistantMessageEntry(
+    sessionManager: { getLeafId(): string | null; getBranch(id?: string): any[] },
+    targetTimestamp?: number,
+    allowFallback = true,
+  ): { id: string; parentId?: string | null } | null {
+    const leafId = sessionManager.getLeafId();
+    if (!leafId) return null;
+
+    const branch = sessionManager.getBranch(leafId);
+
+    if (typeof targetTimestamp === "number" && Number.isFinite(targetTimestamp)) {
+      for (let i = branch.length - 1; i >= 0; i--) {
+        const entry = branch[i];
+        if (
+          entry.type === "message" &&
+          entry.message?.role === "assistant" &&
+          entry.message?.timestamp === targetTimestamp
+        ) {
+          return entry;
+        }
+      }
+
+      if (!allowFallback) {
+        return null;
+      }
+    }
+
+    // Fallback to latest assistant in branch.
+    for (let i = branch.length - 1; i >= 0; i--) {
+      const entry = branch[i];
+      if (entry.type === "message" && entry.message?.role === "assistant") {
+        return entry;
+      }
+    }
+
+    return null;
+  }
+
+  async function waitForAssistantMessageEntry(
+    sessionManager: { getLeafId(): string | null; getBranch(id?: string): any[] },
+    targetTimestamp?: number,
+    maxAttempts = 8,
+    delayMs = 20,
+  ): Promise<{ id: string; parentId?: string | null } | null> {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const exact = findAssistantMessageEntry(sessionManager, targetTimestamp, false);
+      if (exact) return exact;
+
+      if (attempt < maxAttempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+
+    return findAssistantMessageEntry(sessionManager);
+  }
+
   async function pruneCheckpoints(exec: ExecFn, currentSessionId: string) {
     try {
       const result = await exec("git", [
@@ -675,8 +744,6 @@ export default function (pi: ExtensionAPI) {
    * Initialize the extension for the current session/repo
    */
   async function initializeForSession(ctx: ExtensionContext) {
-    if (!ctx.hasUI) return;
-
     // Reset all state for fresh initialization
     resetState();
 
@@ -691,7 +758,9 @@ export default function (pi: ExtensionAPI) {
     }
 
     if (!isGitRepo) {
-      ctx.ui.setStatus(STATUS_KEY, undefined);
+      if (ctx.hasUI) {
+        ctx.ui.setStatus(STATUS_KEY, undefined);
+      }
       return;
     }
 
@@ -701,19 +770,6 @@ export default function (pi: ExtensionAPI) {
 
     // Normalize refs for this session (e.g. keep only newest assistant snapshot).
     await pruneCheckpoints(pi.exec, sessionId);
-
-    // Create a resume checkpoint for the current state (session-scoped like other checkpoints)
-    const checkpointId = `checkpoint-resume-${sessionId}-${Date.now()}`;
-
-    try {
-      const success = await createCheckpointFromWorktree(pi.exec, checkpointId);
-      if (success) {
-        resumeCheckpoint = checkpointId;
-        historyCursorCheckpointId = checkpointId;
-      }
-    } catch {
-      // Silent failure - resume checkpoint is optional
-    }
 
     syncCheckpointLabels(ctx);
     updateStatus(ctx);
@@ -857,7 +913,6 @@ export default function (pi: ExtensionAPI) {
 
       checkpoints.clear();
       latestAssistantSnapshot = null;
-      resumeCheckpoint = null;
       pendingCheckpoint = null;
       historyCursorCheckpointId = null;
 
@@ -882,8 +937,7 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("turn_start", async (event, ctx) => {
-    if (!ctx.hasUI) return;
-    if (!isGitRepo) return;
+    if (!(await ensureGitRepo(pi.exec))) return;
 
     // Capture once per agent loop (before first effective tool-side changes).
     // We don't rely on event.turnIndex semantics; instead we only capture when
@@ -901,101 +955,106 @@ export default function (pi: ExtensionAPI) {
     }
   });
 
+  pi.on("message_start", async (event, ctx) => {
+    if (!(await ensureGitRepo(pi.exec))) return;
+
+    // Agent first turns don't emit turn_start.
+    // Capture baseline when assistant starts streaming to support single-turn prompts.
+    if (event.message?.role !== "assistant") return;
+    if (pendingCheckpoint) return;
+
+    try {
+      const commitSha = await captureWorktree();
+      pendingCheckpoint = { commitSha, timestamp: Date.now() };
+    } catch {
+      pendingCheckpoint = null;
+    }
+  });
+
   pi.on("agent_end", async () => {
     // Safety reset: never carry pending turn snapshot across prompts.
     pendingCheckpoint = null;
   });
 
   pi.on("turn_end", async (event, ctx) => {
-    if (!ctx.hasUI) return;
-    if (!isGitRepo) return;
+    if (!(await ensureGitRepo(pi.exec))) return;
     if (!sessionId) return;
 
     let changed = false;
     let createdUserCheckpointId: string | null = null;
     let createdAssistantCheckpointId: string | null = null;
 
-    let consumedPendingCheckpoint = false;
-
     try {
-      // Create assistant-node snapshots only when repo changed.
-      const leafId = ctx.sessionManager.getLeafId();
-      const leafEntry = leafId ? ctx.sessionManager.getEntry(leafId) : undefined;
-      const isAssistantLeaf =
-        leafEntry?.type === "message" &&
-        leafEntry.message?.role === "assistant";
+      // turn_end can race with session persistence. Wait briefly for this turn's
+      // assistant entry to appear, then use it as tree navigation anchor.
+      const assistantEntry = await waitForAssistantMessageEntry(
+        ctx.sessionManager,
+        event.message?.role === "assistant" ? event.message.timestamp : undefined,
+      );
+      const assistantEntryKey = assistantEntry ? sanitizeForRef(assistantEntry.id) : null;
+      const assistantCommitSha = await captureWorktree();
 
-      if (leafId && isAssistantLeaf) {
-        const leafKey = sanitizeForRef(leafId);
-        const assistantCommitSha = await captureWorktree();
+      const hasRepoChangesSinceTurnStart = pendingCheckpoint
+        ? !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, [pendingCheckpoint.commitSha]))
+        : true;
 
-        const hasRepoChangesSinceTurnStart = pendingCheckpoint
-          ? !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, [pendingCheckpoint.commitSha]))
-          : true;
+      // Only create a user checkpoint when the repo actually changed during this turn.
+      if (pendingCheckpoint && hasRepoChangesSinceTurnStart) {
+        const userEntry = findUserMessageEntry(ctx.sessionManager);
+        if (userEntry) {
+          const sanitizedEntryId = sanitizeForRef(userEntry.id);
+          if (!checkpoints.has(sanitizedEntryId)) {
+            const checkpointId = `checkpoint-${sessionId}-${pendingCheckpoint.timestamp}-${sanitizedEntryId}`;
+            await pi.exec("git", [
+              "update-ref",
+              `${REF_PREFIX}${checkpointId}`,
+              pendingCheckpoint.commitSha,
+            ]);
+            checkpoints.set(sanitizedEntryId, checkpointId);
+            createdUserCheckpointId = checkpointId;
+            changed = true;
+          }
+        }
+      }
 
-        // Only create a user checkpoint when the repo actually changed during this turn.
-        if (pendingCheckpoint && hasRepoChangesSinceTurnStart) {
-          const userEntry = findUserMessageEntry(ctx.sessionManager);
-          if (userEntry) {
-            const sanitizedEntryId = sanitizeForRef(userEntry.id);
-            if (!checkpoints.has(sanitizedEntryId)) {
-              const checkpointId = `checkpoint-${sessionId}-${pendingCheckpoint.timestamp}-${sanitizedEntryId}`;
-              await pi.exec("git", [
-                "update-ref",
-                `${REF_PREFIX}${checkpointId}`,
-                pendingCheckpoint.commitSha,
-              ]);
-              checkpoints.set(sanitizedEntryId, checkpointId);
-              createdUserCheckpointId = checkpointId;
-              changed = true;
-            }
+      const comparisonTargets: string[] = [];
+      if (latestAssistantSnapshot?.checkpointId) {
+        comparisonTargets.push(`${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`);
+      }
+      if (createdUserCheckpointId) {
+        comparisonTargets.push(`${REF_PREFIX}${createdUserCheckpointId}`);
+      }
+      if (historyCursorCheckpointId) {
+        comparisonTargets.push(`${REF_PREFIX}${historyCursorCheckpointId}`);
+      }
+      if (pendingCheckpoint?.commitSha) {
+        comparisonTargets.push(pendingCheckpoint.commitSha);
+      }
 
+      const hasRepoChanges = hasRepoChangesSinceTurnStart &&
+        !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, comparisonTargets));
+
+      if (assistantEntryKey && hasRepoChanges) {
+        const assistantCheckpointId = `${ASSISTANT_CHECKPOINT_PREFIX}${sessionId}-${Date.now()}-${assistantEntryKey}`;
+
+        await pi.exec("git", [
+          "update-ref",
+          `${REF_PREFIX}${assistantCheckpointId}`,
+          assistantCommitSha,
+        ]);
+
+        // Keep only one assistant snapshot: the newest one.
+        if (latestAssistantSnapshot && latestAssistantSnapshot.checkpointId !== assistantCheckpointId) {
+          await pi.exec("git", ["update-ref", "-d", `${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`]).catch(() => {});
+          if (checkpoints.get(latestAssistantSnapshot.entryId) === latestAssistantSnapshot.checkpointId) {
+            checkpoints.delete(latestAssistantSnapshot.entryId);
           }
         }
 
-        const comparisonTargets: string[] = [];
-        if (latestAssistantSnapshot?.checkpointId) {
-          comparisonTargets.push(`${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`);
-        }
-        if (createdUserCheckpointId) {
-          comparisonTargets.push(`${REF_PREFIX}${createdUserCheckpointId}`);
-        }
-        if (historyCursorCheckpointId) {
-          comparisonTargets.push(`${REF_PREFIX}${historyCursorCheckpointId}`);
-        }
-        if (pendingCheckpoint?.commitSha) {
-          comparisonTargets.push(pendingCheckpoint.commitSha);
-        }
-
-        const hasRepoChanges = hasRepoChangesSinceTurnStart &&
-          !(await hasSameTreeAsAny(pi.exec, assistantCommitSha, comparisonTargets));
-
-        if (hasRepoChanges) {
-          const assistantCheckpointId = `${ASSISTANT_CHECKPOINT_PREFIX}${sessionId}-${Date.now()}-${leafKey}`;
-
-          await pi.exec("git", [
-            "update-ref",
-            `${REF_PREFIX}${assistantCheckpointId}`,
-            assistantCommitSha,
-          ]);
-
-          // Keep only one assistant snapshot: the newest one.
-          if (latestAssistantSnapshot && latestAssistantSnapshot.checkpointId !== assistantCheckpointId) {
-            await pi.exec("git", ["update-ref", "-d", `${REF_PREFIX}${latestAssistantSnapshot.checkpointId}`]).catch(() => {});
-            if (checkpoints.get(latestAssistantSnapshot.entryId) === latestAssistantSnapshot.checkpointId) {
-              checkpoints.delete(latestAssistantSnapshot.entryId);
-            }
-          }
-
-          checkpoints.set(leafKey, assistantCheckpointId);
-          latestAssistantSnapshot = { entryId: leafKey, checkpointId: assistantCheckpointId };
-          createdAssistantCheckpointId = assistantCheckpointId;
-          changed = true;
-        }
-
-        if (pendingCheckpoint) {
-          consumedPendingCheckpoint = true;
-        }
+        checkpoints.set(assistantEntryKey, assistantCheckpointId);
+        latestAssistantSnapshot = { entryId: assistantEntryKey, checkpointId: assistantCheckpointId };
+        createdAssistantCheckpointId = assistantCheckpointId;
+        changed = true;
       }
 
       if (changed) {
@@ -1013,95 +1072,8 @@ export default function (pi: ExtensionAPI) {
     } catch {
       // Silent failure - checkpoint creation is not critical
     } finally {
-      if (consumedPendingCheckpoint) {
-        pendingCheckpoint = null;
-      }
-    }
-  });
-
-  pi.on("session_before_fork", async (event, ctx) => {
-    if (!ctx.hasUI) return;
-    if (!sessionId) return;
-
-    try {
-      const result = await pi.exec("git", ["rev-parse", "--is-inside-work-tree"]);
-      if (result.stdout.trim() !== "true") return;
-    } catch {
-      return;
-    }
-
-    const sanitizedEntryId = sanitizeForRef(event.entryId);
-    let checkpointId = checkpoints.get(sanitizedEntryId);
-    let usingResumeCheckpoint = false;
-
-    if (!checkpointId && resumeCheckpoint) {
-      checkpointId = resumeCheckpoint;
-      usingResumeCheckpoint = true;
-    }
-
-    const restoreTargetLabel = usingResumeCheckpoint ? "session start" : "selected node";
-    const options: Array<{
-      id: "conversation_only" | "restore_all" | "restore_files_only";
-      label: string;
-    }> = [
-      { id: "conversation_only", label: "Conversation only (keep current files)" },
-    ];
-
-    if (checkpointId) {
-      options.push({
-        id: "restore_all",
-        label: `Restore files + conversation to ${restoreTargetLabel}`,
-      });
-      options.push({
-        id: "restore_files_only",
-        label: `Restore files only to ${restoreTargetLabel} (keep conversation)`,
-      });
-    }
-
-    const choiceLabel = await ctx.ui.select(
-      "Restore Options",
-      options.map((option) => option.label),
-    );
-
-    if (!choiceLabel) {
-      ctx.ui.notify("Restore cancelled", "info");
-      return { cancel: true };
-    }
-
-    const selectedOption = options.find((option) => option.label === choiceLabel);
-    if (!selectedOption) {
-      ctx.ui.notify("Invalid restore selection", "warning");
-      return { cancel: true };
-    }
-
-    if (selectedOption.id === "conversation_only") {
-      return;
-    }
-
-    if (!checkpointId) {
-      ctx.ui.notify("No checkpoint available", "error");
-      return { cancel: true };
-    }
-
-    const ref = `${REF_PREFIX}${checkpointId}`;
-    const success = await restoreWithBackup(
-      pi.exec,
-      ref,
-      sessionId,
-      ctx.ui.notify.bind(ctx.ui)
-    );
-    
-    if (!success) {
-      // File restore failed - cancel the branch operation entirely
-      // (restoreWithBackup already notified the user of the error)
-      return { cancel: true };
-    }
-    
-    historyCursorCheckpointId = checkpointId;
-    ctx.ui.notify(`Files restored to ${restoreTargetLabel}`, "info");
-
-    if (selectedOption.id === "restore_files_only") {
-      return { skipConversationRestore: true };
+      // Never carry pending turn snapshot across turns.
+      pendingCheckpoint = null;
     }
   });
 

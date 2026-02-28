@@ -4,7 +4,7 @@
   "defaultProvider": "openai-codex",
   "defaultModel": "gpt-5.3-codex",
   "editorPaddingX": 0,
-  "defaultThinkingLevel": "medium",
+  "defaultThinkingLevel": "high",
   "theme": "catppuccin-mocha",
   "transport": "sse",
   "shellPath": "/usr/sbin/fish",
@@ -66,7 +66,8 @@
     "-extensions/image-paste-ui.ts",
     "-extensions/working-vibes/index.ts",
     "+extensions/figma-start.ts",
-    "+extensions/powerline-footer/index.ts"
+    "+extensions/powerline-footer/index.ts",
+    "-extensions/rewind/index.ts"
   ],
   "workingVibeModel": "openai-codex/gpt-5.3-codex",
   "workingVibe": "game-dev",
