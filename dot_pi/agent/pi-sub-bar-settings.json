@@ -46,7 +46,7 @@
     "widgetPlacement": "belowEditor",
     "showContextBar": false,
     "errorThreshold": 25,
-    "warningThreshold": 50,
+    "warningThreshold": 75,
     "overflow": "truncate",
     "successThreshold": 75
   },
@@ -157,7 +157,7 @@
         "widgetPlacement": "belowEditor",
         "showContextBar": false,
         "errorThreshold": 25,
-        "warningThreshold": 50,
+        "warningThreshold": 75,
         "overflow": "truncate",
         "successThreshold": 75
       },
