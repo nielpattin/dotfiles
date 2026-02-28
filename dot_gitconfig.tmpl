@@ -47,3 +47,15 @@
 	alias = config --get-regexp alias.
 [init]
 	defaultBranch = main
+[credential "https://github.com"]
+{{- if eq .chezmoi.os "windows" }}
+	helper = manager
+{{- else }}
+	helper = !/home/niel/.local/share/mise/installs/gh/2.87.3/gh_2.87.3_linux_amd64/bin/gh auth git-credential
+{{- end }}
+[credential "https://gist.github.com"]
+{{- if eq .chezmoi.os "windows" }}
+	helper = manager
+{{- else }}
+	helper = !/home/niel/.local/share/mise/installs/gh/2.87.3/gh_2.87.3_linux_amd64/bin/gh auth git-credential
+{{- end }}
