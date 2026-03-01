@@ -9,7 +9,6 @@
   "transport": "sse",
   "shellPath": "/usr/sbin/fish",
   "packages": [
-    "https://github.com/Whamp/pi-read-map",
     {
       "source": "git:github.com/tmustier/pi-extensions",
       "extensions": [

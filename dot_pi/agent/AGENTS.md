@@ -1,5 +1,0 @@
-- User is on a Linux machine.
-- Default shell/tooling is `fish`.
-- In this dotfiles repo, Pi config source is `$HOME/.local/share/chezmoi/dot_pi` (maps to live `$HOME/.pi`). Edit source first, then sync with `chezmoi apply`. Only check/edit live `~/.pi` directly when explicitly requested.
-- For pi internals tasks only, pi-mono repo is in `$HOME/repo/pi-mono` folder.
-- When user wants to install a new extension or package, prefer `git clone` over `npm`.
