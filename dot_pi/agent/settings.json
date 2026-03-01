@@ -44,7 +44,8 @@
         "+packages/sub-bar/index.ts"
       ]
     },
-    "git:github.com/nicobailon/pi-subagents"
+    "git:github.com/nicobailon/pi-subagents",
+    "https://github.com/nicobailon/visual-explainer"
   ],
   "skills": [
     "-../../.agents/skills/prd/SKILL.md",

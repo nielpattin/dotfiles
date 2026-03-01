@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# WSL-safe surf launcher: bypass Windows mise bash shim recursion/hangs.
+# Route through pwsh + script file to avoid UNC cwd warnings and preserve args.
+
+proxy_ps1="$HOME/.local/bin/surf.ps1"
+if command -v pwsh.exe >/dev/null 2>&1 && [ -f "$proxy_ps1" ]; then
+  exec pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "$proxy_ps1")" "$@"
+fi
+
+# Fallbacks (if pwsh/script unavailable)
+if command -v surf.exe >/dev/null 2>&1; then
+  exec surf.exe "$@"
+fi
+
+if [ -n "${USERPROFILE:-}" ]; then
+  win_home="$(wslpath -u "$USERPROFILE" 2>/dev/null || true)"
+  if [ -n "$win_home" ] && [ -x "$win_home/AppData/Local/mise/shims/surf.exe" ]; then
+    exec "$win_home/AppData/Local/mise/shims/surf.exe" "$@"
+  fi
+fi
+
+echo "surf: could not find surf.exe on Windows PATH" >&2
+echo "Try running in Windows once: surf --version" >&2
+exit 127
