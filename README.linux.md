@@ -13,16 +13,17 @@ Install at minimum:
 - `eza`
 - `make`
 - `gcc`
+- `xdg-utils` (provides `xdg-open`, used by Pi visual HTML outputs)
 
 Examples:
 
 ```bash
 # Arch
-sudo pacman -S --needed git chezmoi curl fish eza make gcc
+sudo pacman -S --needed git chezmoi curl fish eza make gcc xdg-utils
 
 # Debian/Ubuntu
 sudo apt update
-sudo apt install -y git chezmoi curl fish eza build-essential
+sudo apt install -y git chezmoi curl fish eza build-essential xdg-utils
 ```
 
 Required secret key file:
@@ -57,6 +58,18 @@ If your login shell is not fish:
 
 ```bash
 chsh -s "$(command -v fish)"
+```
+
+Browser opener check (`xdg-open`, used by Pi visual HTML pages):
+
+```bash
+command -v xdg-open
+```
+
+WSL fallback if needed:
+
+```bash
+explorer.exe "$(wslpath -w ~/.agent/diagrams/<file>.html)"
 ```
 
 ## 4) Optional: Pi CLI via pnpm
